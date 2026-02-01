@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova's Pensieve - Ultra Refraction</title>
+    <title>Nova's Pensieve - Perfect Refraction</title>
     <style>
         :root { --glass: rgba(0, 0, 0, 0.7); --border: rgba(255, 255, 255, 0.15); --gold: #d4af37; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: serif; }
 
-        /* 背景层：依然保留，用于提供模糊的底层视觉 */
         #main-stage {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-size: cover; background-position: center;
@@ -25,12 +24,10 @@
         .discipline-center { position: absolute; top: 45%; left: 55%; transform: translate(-50%, -50%); width: 85%; max-width: 450px; z-index: 10; }
         details { background: rgba(10, 15, 25, 0.9); border: 1px solid var(--gold); padding: 25px; border-radius: 20px; backdrop-filter: blur(25px); box-shadow: 0 30px 60px rgba(0,0,0,0.8); }
         summary { font-size: 1.1rem; letter-spacing: 5px; cursor: pointer; color: var(--gold); list-style: none; text-align: center; outline: none; }
-        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 2rem; margin: 15px 0; display: none; text-shadow: 0 0 10px var(--gold); }
-        .rules { margin-top: 20px; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; line-height: 1.6; }
+        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 2rem; margin: 10px 0; display: none; }
+        .rules { margin-top: 20px; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; }
 
         .bottom-bar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--glass); padding: 10px 30px; border-radius: 50px; display: flex; gap: 20px; align-items: center; z-index: 10; border: 1px solid var(--border); }
-        .ctrl-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #999; }
-        input[type=range] { accent-color: var(--gold); width: 80px; }
         .play-btn { background: none; border: 1px solid var(--gold); color: var(--gold); border-radius: 20px; padding: 5px 20px; cursor: pointer; font-size: 11px; }
     </style>
 </head>
@@ -42,32 +39,26 @@
     <div class="side-nav">
         <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card">🏦<br>古灵</a>
         <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card">🐾<br>嗅嗅</a>
-        <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card">📜<br>日报</a>
-        <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card">🔮<br>看板</a>
     </div>
 
     <div class="discipline-center">
         <details open>
             <summary>✧ DISCIPLINE ✧</summary>
             <div id="timer-box">05:00</div>
-            <div class="rules" id="rule-content">
-                1. <b>情绪拦截</b>：产生焦虑时，启动冷静倒计时。<br>
-                2. <b>信号确认</b>：看板未现强力突破，绝不动手。<br>
-                3. <b>保护机制</b>：古灵阁冷却期间，严禁劫持系统。<br>
+            <div class="rules">
+                1. <b>情绪拦截</b>：焦虑产生时，启动拦截。<br>
                 <button class="play-btn" style="width:100%; margin-top:15px;" onclick="startIntercept(300)">启动冷静拦截</button>
             </div>
         </details>
     </div>
 
     <div class="bottom-bar">
-        <div class="ctrl-item">🖼️ 
-            <select id="bg-select" onchange="changeBG()" style="background:#000; color:white; border:none;">
-                <option value="pensive.png">Pensive</option>
-                <option value="train.png">Express</option>
-            </select>
-        </div>
-        <div class="ctrl-item">🔊 <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5" oninput="sync()"></div>
-        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="20" max="100" step="1" value="40" oninput="initRain()"></div>
+        <select id="bg-select" onchange="changeBG()" style="background:#000; color:white; border:none;">
+            <option value="pensive.png">Pensive</option>
+            <option value="train.png">Express</option>
+        </select>
+        <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5" oninput="sync()">
+        <input type="range" id="rain-den" min="20" max="100" value="40" oninput="initRain()">
         <button id="pbtn" class="play-btn" onclick="toggle(event)">PLAY</button>
     </div>
 
@@ -78,20 +69,24 @@
         const ctx = canvas.getContext('2d');
         const audio = document.getElementById('audio');
         const stage = document.getElementById('main-stage');
-        const bgImg = new Image(); // 核心：用于折射的像素源
+        const bgImg = new Image();
 
         const dropAlpha = new Image();
-        dropAlpha.src = 'https://rainyscope.com/img/drop-alpha.png';
+        dropAlpha.src = 'drop-alpha.png'; // 确保文件名与你下载的一致
         const dropColor = new Image();
-        dropColor.src = 'https://rainyscope.com/img/drop-color.png';
+        dropColor.src = 'drop-color.png';
 
         let drops = [];
         let timerInterval;
 
+        // 图片在大图里的行列数 (Rainyscope 通常是 5x5)
+        const cols = 5;
+        const rows = 5;
+
         function changeBG() {
             const val = document.getElementById('bg-select').value;
             stage.style.backgroundImage = `url("${val}")`;
-            bgImg.src = val; // 更新折射源
+            bgImg.src = val;
         }
 
         function resize() {
@@ -104,50 +99,64 @@
             drops = [];
             const density = document.getElementById('rain-den').value;
             document.documentElement.style.setProperty('--fog', (density/20) + 'px');
+            
+            // 计算单颗雨滴在原始图中的尺寸
+            const sw = dropAlpha.width / cols;
+            const sh = dropAlpha.height / rows;
+
             for (let i = 0; i < density; i++) {
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    s: Math.random() * 0.3 + 0.2, // 水滴大小
-                    v: Math.random() * 0.6 + 0.3, // 下落速度
-                    a: Math.random() * 0.5 + 0.3  
+                    // 随机选一颗贴纸
+                    si: Math.floor(Math.random() * cols) * sw,
+                    sj: Math.floor(Math.random() * rows) * sh,
+                    sw: sw,
+                    sh: sh,
+                    s: Math.random() * 0.4 + 0.2, 
+                    v: Math.random() * 1.5 + 0.5, 
+                    a: Math.random() * 0.6 + 0.3  
                 });
             }
         }
 
-        // 核心逻辑：物理合成渲染
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
+            if (!bgImg.complete || !dropAlpha.complete) {
+                requestAnimationFrame(draw);
+                return;
+            }
+
             drops.forEach(d => {
-                const w = dropAlpha.width * d.s;
-                const h = dropAlpha.height * d.s;
+                const dw = d.sw * d.s;
+                const dh = d.sh * d.s;
 
                 ctx.save();
                 ctx.translate(d.x, d.y);
                 
-                // 1. 先画形状 (遮罩层)
+                // 1. 剪裁出正确的雨滴形状
                 ctx.globalAlpha = d.a;
-                ctx.drawImage(dropAlpha, 0, 0, w, h);
+                ctx.drawImage(dropAlpha, d.si, d.sj, d.sw, d.sh, 0, 0, dw, dh);
 
-                // 2. 合成折射 (只在形状内画背景，并位移)
+                // 2. 核心折射
                 ctx.globalCompositeOperation = 'source-in';
                 ctx.save();
-                ctx.translate(-d.x, -d.y + 15); // 关键：背景像素上移 15px
-                ctx.filter = 'brightness(1.2) contrast(1.1)'; // 水滴内亮一点
+                ctx.translate(-d.x, -d.y + 15); 
+                ctx.filter = 'brightness(1.2) contrast(1.1)';
                 ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
                 ctx.restore();
 
-                // 3. 叠加光泽 (让水滴有边缘彩光)
+                // 3. 叠加反光彩色
                 ctx.globalCompositeOperation = 'screen';
                 ctx.globalAlpha = 0.4;
-                ctx.drawImage(dropColor, 0, 0, w, h);
+                ctx.drawImage(dropColor, d.si, d.sj, d.sw, d.sh, 0, 0, dw, dh);
 
                 ctx.restore();
 
                 d.y += d.v;
                 if (d.y > canvas.height) {
-                    d.y = -h;
+                    d.y = -dh;
                     d.x = Math.random() * canvas.width;
                 }
             });
@@ -163,10 +172,7 @@
                 const m = Math.floor(timeLeft / 60);
                 const s = timeLeft % 60;
                 box.innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-                if(timeLeft-- <= 0) {
-                    clearInterval(timerInterval);
-                    box.innerText = "ZEN";
-                }
+                if(timeLeft-- <= 0) { clearInterval(timerInterval); box.innerText = "ZEN"; }
             }, 1000);
         }
 
