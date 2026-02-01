@@ -3,10 +3,10 @@
 (function() {
     // 模拟源码的配置参数
     const config = {
-        brightness: 1.05,
-        alphaMultiply: 6.0,
-        alphaSubtract: 3.0,
-        refraction: 0.35
+        brightness: 1.1,      // 稍微提高雨滴亮度
+        alphaMultiply: 10.0,  // 提高对比度
+        alphaSubtract: 1.5,   // 关键：减小这个值，让雨滴痕迹变厚
+        refraction: 0.5       // 增加折射率，让变形更明显
     };
 
     // 动态生成源码要求的形状贴图，确保即便没有外部 png 也能正常产生雨滴形状
@@ -80,17 +80,20 @@
     RainRenderer.prototype.resize = function() {
     this.width = window.innerWidth;
     this.height = window.innerHeight;
+    
+    // 逻辑尺寸
     this.canvas.style.width = this.width + 'px';
     this.canvas.style.height = this.height + 'px';
     
-    // 关键点：统一物理像素尺寸
-    const w = this.width * this.ratio;
-    const h = this.height * this.ratio;
-    this.canvas.width = this.dropCanvas.width = w;
-    this.canvas.height = this.dropCanvas.height = h;
+    // 物理像素尺寸：必须完全一致
+    const realW = Math.floor(this.width * this.ratio);
+    const realH = Math.floor(this.height * this.ratio);
     
-    this.gl.viewport(0, 0, w, h);
-};
+    this.canvas.width = this.dropCanvas.width = realW;
+    this.canvas.height = this.dropCanvas.height = realH;
+    
+    this.gl.viewport(0, 0, realW, realH);
+};;
 
     RainRenderer.prototype.updateBackground = function(url) {
     const gl = this.gl;
@@ -119,42 +122,45 @@
             });
         }
 
-        // 2. 离屏绘制：将所有雨滴画到 dropCanvas 上
+        // 2. 离屏绘制：关键在于 clearRect 必须覆盖整块物理像素画布
         this.dropCtx.clearRect(0, 0, this.dropCanvas.width, this.dropCanvas.height);
         for (let i = this.drops.length - 1; i >= 0; i--) {
             let d = this.drops[i]; 
-            d.y += d.v;
+            d.y += d.v; // 下落逻辑
             this.dropCtx.drawImage(this.dropImg, d.x - d.r, d.y - d.r, d.r * 2, d.r * 2);
-            // 性能优化：移出屏幕后清理
             if (d.y > this.dropCanvas.height + 100) this.drops.splice(i, 1);
         }
 
         const gl = this.gl;
 
-        // 3. WebGL 更新：上传雨滴贴图
-        gl.activeTexture(gl.TEXTURE1); // 必须先指定单元
+        // 3. WebGL 更新：先指定程序，再绑定数据
+        gl.useProgram(this.prog);
+
+        // 处理背景纹理 (Unit 0)
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
+        gl.uniform1i(gl.getUniformLocation(this.prog, "u_bg"), 0);
+
+        // 处理水滴纹理 (Unit 1)
+        gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
+        // 关键修复：确保纹理数据实时上传
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.dropCanvas);
-        // 增加这三行，确保纹理在各种分辨率下都能正常采样
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-        // 4. 渲染配置：关联 Uniform 变量
-        gl.useProgram(this.prog);
-        
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
-        
-        gl.uniform1i(gl.getUniformLocation(this.prog, "u_bg"), 0);
         gl.uniform1i(gl.getUniformLocation(this.prog, "u_water"), 1);
-        gl.uniform1f(gl.getUniformLocation(this.prog, "u_br"), config.brightness);
-        gl.uniform1f(gl.getUniformLocation(this.prog, "u_aMult"), config.alphaMultiply);
-        gl.uniform1f(gl.getUniformLocation(this.prog, "u_aSub"), config.alphaSubtract);
-        gl.uniform1f(gl.getUniformLocation(this.prog, "u_ref"), config.refraction);
 
-        // 5. 绘制
+        // 4. 上传配置参数 (确保使用外部作用域的 config)
+        const loc = (name) => gl.getUniformLocation(this.prog, name);
+        gl.uniform1f(loc("u_br"), config.brightness);
+        gl.uniform1f(loc("u_aMult"), config.alphaMultiply);
+        gl.uniform1f(loc("u_aSub"), config.alphaSubtract);
+        gl.uniform1f(loc("u_ref"), config.refraction);
+
+        // 5. 绘制全屏矩形
         gl.drawArrays(gl.TRIANGLES, 0, 6);
+        
         requestAnimationFrame(this.loop.bind(this));
     };
 
