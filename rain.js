@@ -86,27 +86,31 @@
     };
 
     RainRenderer.prototype.resize = function() {
+    // 获取屏幕逻辑尺寸
     this.width = window.innerWidth;
     this.height = window.innerHeight;
     this.ratio = window.devicePixelRatio || 1;
-    
-    // 1. 设置 CSS 逻辑尺寸，防止溢出屏幕
+
+    // 1. 修正 CSS：禁止溢出，固定全屏
+    this.container.style.overflow = 'hidden';
+    this.canvas.style.position = 'absolute';
     this.canvas.style.width = this.width + 'px';
     this.canvas.style.height = this.height + 'px';
-    this.canvas.style.position = 'absolute';
-    this.canvas.style.top = '0';
-    this.canvas.style.left = '0';
-    
-    // 2. 设置物理像素尺寸
+
+    // 2. 修正物理像素：这是防止“被拽大”的关键
     const realW = Math.floor(this.width * this.ratio);
     const realH = Math.floor(this.height * this.ratio);
-    
+
     this.canvas.width = realW;
     this.canvas.height = realH;
-    this.dropCanvas.width = realW;
-    this.dropCanvas.height = realH;
     
-    // 3. 核心：必须告诉 WebGL 绘制区域的大小，否则背景会错位或溢出
+    // 3. 必须同步离屏 Canvas 尺寸
+    if (this.dropCanvas) {
+        this.dropCanvas.width = realW;
+        this.dropCanvas.height = realH;
+    }
+
+    // 4. 核心：重设 WebGL 视口，强制 1:1 匹配
     this.gl.viewport(0, 0, realW, realH);
 };
   RainRenderer.prototype.updateBackground = function(url) {
