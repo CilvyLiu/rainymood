@@ -8,16 +8,22 @@
     }
 
     function loadImages(images, callback) {
-        var loaded = 0, dict = {};
-        images.forEach(function(item) {
-            var img = new Image();
-            img.onload = function() {
-                dict[item.name] = img;
-                if (++loaded === images.length) callback(dict);
-            };
-            img.src = item.src;
-        });
-    }
+    var loaded = 0, dict = {};
+    images.forEach(function(item) {
+        var img = new Image();
+        img.onload = function() {
+            dict[item.name] = img;
+            if (++loaded === images.length) callback(dict);
+        };
+        // 关键点：增加 onerror，防止一张图挂掉导致整个冥想盆黑屏
+        img.onerror = function() {
+            console.error("Nova，图片加载失败了，路径是: " + item.src);
+            // 即使失败也继续计数，防止程序彻底卡死
+            if (++loaded === images.length) callback(dict);
+        };
+        img.src = item.src;
+    });
+}
 
     function Raindrops(width, height, scale, dropAlpha, dropColor) {
         this.width = width;
