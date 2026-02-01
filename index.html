@@ -2,71 +2,75 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nova's Pensieve</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: black; color: white; overflow: hidden; font-family: serif; }
+        /* 1. 基础样式优化 */
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: #0a0a0a; /* 改为极深灰，确认页面已加载 */
+            color: white; overflow: hidden; font-family: serif; 
+        }
         
         #bg-layer {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            transition: all 1.5s ease-in-out;
+            transition: all 1.2s ease-in-out;
             background-repeat: no-repeat;
             background-position: center;
             z-index: -3;
+            /* 初始占位背景 */
+            background-color: #000;
         }
 
         #mask {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            transition: all 1.5s ease-in-out;
-            z-index: -2;
+            z-index: -2; transition: 0.5s;
         }
 
-        /* 使用你上传的 stardust.png 作为雨点滤镜 */
+        /* 2. 强化雨点层：使用本地 stardust.png 并增加备用噪点 */
         #rain-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-image: url("stardust.png");
+            background-image: url("./stardust.png");
+            background-repeat: repeat;
             opacity: 0.3;
             pointer-events: none;
             z-index: -1;
+            filter: contrast(150%); /* 增加对比度让雨点更明显 */
         }
 
+        /* 3. UI 布局 */
         .container {
             display: flex; flex-direction: column; align-items: center;
-            justify-content: space-between; height: 100vh; padding: 40px 0;
-            box-sizing: border-box; z-index: 10; position: relative;
+            justify-content: space-between; height: 100vh; padding: 30px 0;
+            box-sizing: border-box; z-index: 10;
         }
-
-        .header h2 { letter-spacing: 10px; opacity: 0.7; margin: 0; }
-        .header p { color: #555; font-size: 12px; margin-top: 5px; }
 
         .nav-grid {
             display: grid; grid-template-columns: repeat(4, 1fr);
-            gap: 20px; width: 90%; max-width: 900px;
+            gap: 15px; width: 90%; max-width: 800px;
         }
         .nav-card {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.07);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px; padding: 20px;
+            border-radius: 12px; padding: 15px;
             text-align: center; text-decoration: none; color: white;
-            backdrop-filter: blur(10px); transition: 0.4s;
+            backdrop-filter: blur(8px); transition: 0.3s;
         }
-        .nav-card:hover { border-color: #00d4ff; transform: translateY(-5px); background: rgba(0, 212, 255, 0.1); }
+        .nav-card:hover { border-color: #00d4ff; background: rgba(0, 212, 255, 0.1); }
 
         .audio-controls {
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
             padding: 15px 25px; border-radius: 40px;
             display: flex; align-items: center; gap: 20px;
-            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
         }
-        .slider-group { display: flex; align-items: center; gap: 10px; }
-        input[type=range] { cursor: pointer; accent-color: #00d4ff; }
+        input[type=range] { accent-color: #00d4ff; cursor: pointer; }
 
-        .scene-switcher { display: flex; gap: 10px; margin-top: 20px; }
+        .scene-switcher { display: flex; gap: 8px; margin-top: 15px; flex-wrap: wrap; justify-content: center; }
         button {
-            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
-            color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; transition: 0.3s;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer;
         }
-        button:hover { background: rgba(0,212,255,0.2); border-color: #00d4ff; }
+        button:active { transform: scale(0.95); }
     </style>
 </head>
 <body onclick="initAudio()">
@@ -76,72 +80,75 @@
     <div id="rain-overlay"></div>
 
     <div class="container">
-        <div class="header" style="text-align: center;">
-            <h2>THE PENSIEVE</h2>
-            <p id="clock"></p>
+        <div style="text-align: center;">
+            <h1 style="letter-spacing: 12px; opacity: 0.8; margin: 0; font-size: 24px;">THE PENSIEVE</h1>
+            <p id="clock" style="color: #666; font-size: 12px; margin-top: 5px;"></p>
         </div>
 
         <div class="nav-grid">
-            <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card"><h2>🏦</h2><div style="font-size:14px;">古灵阁</div></a>
-            <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card"><h2>🐾</h2><div style="font-size:14px;">嗅嗅探测</div></a>
-            <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card"><h2>📜</h2><div style="font-size:14px;">预言日报</div></a>
-            <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card"><h2>🔮</h2><div style="font-size:14px;">战略看板</div></a>
+            <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card"><h3>🏦</h3><div style="font-size:12px;">古灵阁</div></a>
+            <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card"><h2>🐾</h2><div style="font-size:12px;">嗅嗅探测</div></a>
+            <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card"><h2>📜</h2><div style="font-size:12px;">预言日报</div></a>
+            <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card"><h2>🔮</h2><div style="font-size:12px;">战略看板</div></a>
         </div>
 
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 20px;">
+        <div style="display: flex; flex-direction: column; align-items: center;">
             <div class="audio-controls">
-                <div class="slider-group">
-                    <span>🔊音量</span>
-                    <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.5" oninput="updateAudio()">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>🔊</span>
+                    <input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.5" oninput="updateAudio()">
                 </div>
-                <div class="slider-group">
-                    <span>🌧️雨点</span>
-                    <input type="range" id="rainSlider" min="0" max="1" step="0.01" value="0.3" oninput="updateRain()">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>🌧️</span>
+                    <input type="range" id="rainSlider" min="0" max="1" step="0.05" value="0.3" oninput="updateRain()">
                 </div>
-                <button onclick="toggleAudio()" id="playBtn">🔇 停止播放</button>
+                <button onclick="toggleAudio(event)" id="playBtn" style="min-width: 100px;">🔇 开启音频</button>
             </div>
 
             <div class="scene-switcher">
-                <button onclick="setScene('pensive.png', '450px', 0.85)">🏺 冥想盆</button>
-                <button onclick="setScene('train.png', 'cover', 0.5)">🚂 火车</button>
-                <button onclick="setScene('window.png', 'cover', 0.5)">🪟 落地窗</button>
-                <button onclick="setScene('beach.png', 'cover', 0.5)">🏖️ 沙滩</button>
-                <button onclick="setScene('mountain.png', 'cover', 0.5)">⛰️ 山顶</button>
+                <button onclick="setScene('./pensive.png', '450px', 0.85)">🏺 冥想盆</button>
+                <button onclick="setScene('./train.png', 'cover', 0.5)">🚂 火车</button>
+                <button onclick="setScene('./window.png', 'cover', 0.5)">🪟 落地窗</button>
+                <button onclick="setScene('./beach.png', 'cover', 0.5)">🏖️ 沙滩</button>
+                <button onclick="setScene('./mountain.png', 'cover', 0.5)">⛰️ 山顶</button>
             </div>
         </div>
     </div>
 
-    <audio id="rainAudio" loop src="0.m4a"></audio>
+    <audio id="rainAudio" loop src="./0.m4a"></audio>
 
     <script>
         const audio = document.getElementById('rainAudio');
         const bgLayer = document.getElementById('bg-layer');
         const mask = document.getElementById('mask');
         const rainOverlay = document.getElementById('rain-overlay');
-        const volSlider = document.getElementById('volSlider');
-        const rainSlider = document.getElementById('rainSlider');
         const playBtn = document.getElementById('playBtn');
 
+        // 核心场景切换函数
         function setScene(img, size, brightness) {
-            bgLayer.style.backgroundImage = `url('${img}')`;
+            console.log("正在尝试加载背景:", img);
+            bgLayer.style.backgroundImage = "url('" + img + "')";
             bgLayer.style.backgroundSize = size;
-            mask.style.backgroundColor = `rgba(0, 0, 0, ${brightness})`;
+            mask.style.backgroundColor = "rgba(0, 0, 0, " + brightness + ")";
         }
 
         function initAudio() {
             if (audio.paused) {
-                audio.play().catch(e => {});
-                playBtn.innerText = "🔊 正在播放";
+                audio.play().then(() => {
+                    playBtn.innerText = "🔊 播放中";
+                }).catch(e => console.log("等待交互..."));
             }
         }
 
-        function updateAudio() { audio.volume = volSlider.value; }
+        function updateAudio() {
+            audio.volume = document.getElementById('volSlider').value;
+        }
 
-        function toggleAudio(event) {
-            if(event) event.stopPropagation(); // 防止冒泡触发 body 的 initAudio
+        function toggleAudio(e) {
+            if(e) e.stopPropagation();
             if (audio.paused) {
                 audio.play();
-                playBtn.innerText = "🔊 正在播放";
+                playBtn.innerText = "🔊 播放中";
             } else {
                 audio.pause();
                 playBtn.innerText = "🔇 已停止";
@@ -149,18 +156,21 @@
         }
 
         function updateRain() {
-            rainOverlay.style.opacity = rainSlider.value;
+            rainOverlay.style.opacity = document.getElementById('rainSlider').value;
         }
 
         function updateClock() {
             const now = new Date();
-            document.getElementById('clock').innerText = now.toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai', hour12: false}) + " CST";
+            document.getElementById('clock').innerText = now.toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'}) + " CST";
         }
 
-        // 初始化加载你上传的 pensive.png
-        setScene('pensive.png', '450px', 0.85);
-        setInterval(updateClock, 1000);
-        updateClock();
+        // 初始化
+        window.onload = function() {
+            setScene('./pensive.png', '450px', 0.85);
+            setInterval(updateClock, 1000);
+            updateClock();
+            console.log("页面初始化完成");
+        };
     </script>
 </body>
 </html>
