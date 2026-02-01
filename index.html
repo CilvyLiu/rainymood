@@ -14,48 +14,63 @@
             transition: background-image 1.5s ease-in-out;
         }
 
-        /* 细雨层：两层叠加产生景深 */
-        .rain {
-            position: absolute; top: -100%; left: -10%; width: 120%; height: 200%;
-            background: url("stardust.png") repeat;
-            pointer-events: none; z-index: 3;
-            mix-blend-mode: screen;
-        }
-
-        /* 第一层：极细密的底雨 */
-        #rain-1 {
-            background-size: 150px; /* 颗粒极小 */
-            opacity: 0.3;
-            animation: fine-rain 3s linear infinite;
-        }
-
-        /* 第二层：稍明显的斜掠雨 */
-        #rain-2 {
-            background-size: 250px;
-            opacity: 0.2;
-            animation: fine-rain 2s linear infinite;
-            filter: blur(1px); /* 模糊处理，增加距离感 */
-        }
-
-        @keyframes fine-rain {
-            from { transform: translate(0, 0); }
-            to { transform: translate(15px, 50%); } /* 向右下斜落 */
-        }
-
+        /* 玻璃蒙版层：去掉模糊，改用半透明，保证背景清晰 */
         #glass-mask {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.45);
-            backdrop-filter: blur(3px); /* 强化雾气感 */
+            background: rgba(0, 0, 0, 0.2);
             z-index: 2;
         }
 
-        /* UI 保持一致 */
+        /* 雨滴层：确保是一颗颗清晰可见的 */
+        .rain {
+            position: absolute; top: -100%; left: 0; width: 100%; height: 200%;
+            background: url("stardust.png") repeat;
+            pointer-events: none; z-index: 3;
+            mix-blend-mode: plus-lighter; /* 强力点亮雨滴 */
+        }
+
+        #rain-1 {
+            background-size: 300px; /* 初始大小 */
+            opacity: 0.6;
+            animation: drop-fall 3s linear infinite;
+        }
+
+        #rain-2 {
+            background-size: 450px;
+            opacity: 0.3;
+            animation: drop-fall 5s linear infinite;
+            filter: brightness(1.2); /* 让大颗雨点更亮 */
+        }
+
+        /* 模拟重力滚落动画 */
+        @keyframes drop-fall {
+            from { transform: translateY(-50%); }
+            to { transform: translateY(0%); }
+        }
+
         .content { position: relative; z-index: 10; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 40px 20px; box-sizing: border-box; }
+        
+        .header h1 { letter-spacing: 12px; font-weight: 200; text-shadow: 0 0 20px rgba(0,0,0,1); }
+
         .nav-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; width: 100%; max-width: 600px; }
         @media (max-width: 600px) { .nav-grid { grid-template-columns: repeat(2, 1fr); } }
-        .nav-card { background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; text-align: center; text-decoration: none; color: white; backdrop-filter: blur(10px); transition: 0.3s; }
-        .controls-panel { background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.2); display: flex; flex-direction: column; gap: 15px; width: 90%; max-width: 400px; }
-        .sliders { display: flex; justify-content: space-around; align-items: center; }
+
+        /* 只在卡片上保留模糊，背景保持清晰 */
+        .nav-card { 
+            background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.2); 
+            border-radius: 12px; padding: 15px; text-align: center; text-decoration: none; 
+            color: white; backdrop-filter: blur(10px); transition: 0.3s; 
+        }
+
+        .controls-panel { 
+            background: rgba(0, 0, 0, 0.8); padding: 20px; border-radius: 30px; 
+            border: 1px solid rgba(255,255,255,0.3); display: flex; flex-direction: column; 
+            gap: 15px; width: 90%; max-width: 400px; 
+        }
+
+        .sliders { display: flex; justify-content: space-around; align-items: center; width: 100%; }
+        .sliders span { font-size: 14px; }
+        input[type=range] { width: 80px; accent-color: #fff; cursor: pointer; }
         button { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; }
     </style>
 </head>
@@ -69,8 +84,8 @@
 
     <div class="content">
         <div class="header">
-            <h1 style="letter-spacing: 12px; font-weight: 200;">THE PENSIEVE</h1>
-            <p id="clock" style="opacity: 0.5; font-size: 12px; margin-top: 10px;"></p>
+            <h1>THE PENSIEVE</h1>
+            <p id="clock" style="opacity: 0.8; font-size: 12px; margin-top: 10px;"></p>
         </div>
 
         <div class="nav-grid">
@@ -83,7 +98,7 @@
         <div class="controls-panel">
             <div class="sliders">
                 <span>🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
-                <span>🌧️ <input type="range" id="rain-ctrl" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
+                <span>🌧️ <input type="range" id="rain-size" min="50" max="600" step="10" value="300" oninput="sync()"></span>
                 <button id="pbtn" onclick="toggle(event)">PLAY</button>
             </div>
             <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
@@ -108,10 +123,17 @@
         function change(img) { stage.style.backgroundImage = "url('" + img + "')"; }
         
         function sync() {
+            // 音量调节
             audio.volume = document.getElementById('vol').value;
-            const op = document.getElementById('rain-ctrl').value;
-            r1.style.opacity = op * 0.6;
-            r2.style.opacity = op * 0.4;
+            
+            // 雨滴大小调节
+            const size = document.getElementById('rain-size').value;
+            r1.style.backgroundSize = size + "px";
+            r2.style.backgroundSize = (size * 1.5) + "px"; // 第二层始终大一点，产生错落感
+            
+            // 透明度随大小微调，大雨滴更清晰
+            r1.style.opacity = (size / 600) * 0.8;
+            r2.style.opacity = (size / 600) * 0.5;
         }
 
         function autoPlay() { if(audio.paused) { audio.play().then(() => pbtn.innerText = "STOP").catch(e => {}); } }
