@@ -2,25 +2,31 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Nova's Pensieve - Dynamic Glass Rain</title>
+    <title>Nova's Pensieve - Advanced Zen</title>
     <style>
         :root { --glass: rgba(0, 0, 0, 0.6); --border: rgba(255, 255, 255, 0.15); }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "PingFang SC", serif; }
         
-        /* 关键：背景加深模糊，让前景水珠像宝石一样浮现 */
-        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: background-image 1s; filter: blur(6px) brightness(0.7); }
-        
+        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: background-image 1s; filter: blur(5px) brightness(0.7); }
         #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.3); z-index: 2; pointer-events: none; }
         
         .content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 40px 0; box-sizing: border-box; }
-        .nav-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; width: 90%; max-width: 800px; }
-        .nav-card { background: var(--glass); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; text-decoration: none; color: #ccc; backdrop-filter: blur(10px); transition: 0.3s; font-size: 13px; }
-        .nav-card:hover { color: white; border-color: rgba(255,255,255,0.5); transform: translateY(-3px); }
-        .controls { background: rgba(0, 0, 0, 0.7); padding: 12px 25px; border-radius: 50px; display: flex; align-items: center; gap: 15px; border: 1px solid var(--border); }
-        button { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 15px; border-radius: 20px; cursor: pointer; font-size: 11px; }
-        button:hover { background: white; color: black; }
-        input[type=range] { accent-color: #fff; width: 60px; }
+        
+        /* 折叠菜单样式 */
+        .collapsible-nav { display: none; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; width: 280px; }
+        .nav-card { background: var(--glass); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; text-decoration: none; color: #ccc; backdrop-filter: blur(10px); font-size: 12px; transition: 0.3s; }
+        .nav-card:hover { color: white; border-color: #fff; }
+
+        /* 看板纪律样式 */
+        #ruleBook { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 20; width: 200px; }
+        .rule-content { display: none; background: rgba(20, 20, 20, 0.9); border: 1px solid #555; padding: 15px; border-radius: 10px; font-size: 12px; line-height: 1.8; color: #ddd; margin-bottom: 10px; }
+
+        /* 控制区样式 */
+        .controls { background: rgba(0, 0, 0, 0.7); padding: 10px 20px; border-radius: 50px; display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); }
+        select, button { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white; padding: 5px 12px; border-radius: 15px; cursor: pointer; font-size: 11px; }
+        select option { background: #111; }
+        input[type=range] { accent-color: #fff; width: 50px; }
     </style>
 </head>
 <body onclick="initAudio()">
@@ -29,32 +35,43 @@
     <div id="overlay"></div>
     <canvas id="rainCanvas"></canvas>
 
+    <div id="ruleBook">
+        <div class="rule-content" id="ruleText">
+            <b>📜 看板纪律</b><br><hr style="opacity:0.2">
+            1. 沉浸思考，拒绝浮躁<br>
+            2. 数据为骨，直觉为翼<br>
+            3. 每日三省，复盘得失<br>
+            4. 保持敬畏，不断进化
+        </div>
+        <button onclick="toggleElement('ruleText', event)" style="width:100%">⚖️ 看板纪律</button>
+    </div>
+
     <div class="content">
         <div style="text-align: center;">
             <h1 style="letter-spacing: 12px; font-weight: 200; margin: 0; font-size: 24px;">THE PENSIEVE</h1>
             <div id="clock" style="font-size: 12px; opacity: 0.5; letter-spacing: 2px; margin-top: 8px;"></div>
         </div>
 
-        <div class="nav-grid">
-            <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card">🏦<br>古灵阁</a>
-            <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card">🐾<br>嗅嗅探测</a>
-            <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card">📜<br>预言日报</a>
-            <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card">🔮<br>战略看板</a>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <div class="collapsible-nav" id="navGrid">
+                <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card">🏦 古灵阁</a>
+                <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card">🐾 嗅嗅探测</a>
+                <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card">📜 预言日报</a>
+                <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card">🔮 战略看板</a>
+            </div>
+            <button onclick="toggleElement('navGrid', event)" style="padding: 10px 30px; border-color: #fff;">🪄 魔法传送门</button>
         </div>
 
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
-            <div class="controls">
-                <span>🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
-                <span>🌧️ <input type="range" id="den" min="20" max="150" value="70" oninput="initRain()"></span>
-                <button id="pbtn" onclick="toggleAudio(event)">PLAY</button>
-            </div>
-            <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
-                <button onclick="setScene('pensive.png', 'contain')">🏺 冥想盆</button>
-                <button onclick="setScene('train.png', 'cover')">🚂 火车</button>
-                <button onclick="setScene('window.png', 'cover')">🪟 落地窗</button>
-                <button onclick="setScene('beach.png', 'cover')">🏖️ 沙滩</button>
-                <button onclick="setScene('mountain.png', 'cover')">⛰️ 山顶</button>
-            </div>
+        <div class="controls">
+            <span>🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
+            <select onchange="handleSceneChange(this)">
+                <option value="pensive.png|contain">🏺 冥想盆</option>
+                <option value="train.png|cover">🚂 霍格沃茨特快</option>
+                <option value="window.png|cover">🪟 落地窗前</option>
+                <option value="beach.png|cover">🏖️ 贝壳小屋</option>
+                <option value="mountain.png|cover">⛰️ 禁林山巅</option>
+            </select>
+            <button id="pbtn" onclick="toggleAudio(event)">PLAY</button>
         </div>
     </div>
 
@@ -73,6 +90,17 @@
         let drops = [];
         const sprite = 5;
 
+        function toggleElement(id, e) {
+            e.stopPropagation();
+            const el = document.getElementById(id);
+            el.style.display = (el.style.display === 'grid' || el.style.display === 'block') ? 'none' : (id === 'navGrid' ? 'grid' : 'block');
+        }
+
+        function handleSceneChange(select) {
+            const [img, size] = select.value.split('|');
+            setScene(img, size);
+        }
+
         function setScene(img, size) {
             viewport.style.backgroundImage = `url('${img}')`;
             viewport.style.backgroundSize = size;
@@ -87,19 +115,19 @@
 
         function initRain() {
             drops = [];
-            const density = document.getElementById('den').value;
-            for (let i = 0; i < density; i++) {
-                const isDynamic = Math.random() > 0.8; // 20% 是动态下落滴
+            // 默认大雨滴配置
+            for (let i = 0; i < 60; i++) {
+                const isDynamic = Math.random() > 0.7;
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
                     si: Math.floor(Math.random() * sprite),
                     sj: Math.floor(Math.random() * sprite),
-                    s: isDynamic ? (Math.random() * 0.12 + 0.1) : (Math.random() * 0.05 + 0.04), 
+                    s: isDynamic ? (Math.random() * 0.15 + 0.18) : (Math.random() * 0.05 + 0.08), 
                     v: 0, 
                     isDynamic: isDynamic,
-                    wait: Math.random() * 200, // 下落前的随机迟疑
-                    friction: Math.random() * 0.05 + 0.94 // 摩擦力模拟
+                    wait: Math.random() * 200, 
+                    friction: Math.random() * 0.05 + 0.93
                 });
             }
         }
@@ -108,58 +136,41 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (!imgMask.complete || !imgAlpha.complete) { requestAnimationFrame(draw); return; }
 
-            const sw = imgMask.width / sprite;
-            const sh = imgMask.height / sprite;
-
-            drops.forEach(d => {
+            drops.sort((a,b) => a.s - b.s).forEach(d => {
+                const sw = imgMask.width / sprite;
+                const sh = imgMask.height / sprite;
                 const dw = sw * d.s;
-                const dh = dw * 1.5;
+                const dh = dw * (d.isDynamic ? 1.8 : 1.4);
 
                 ctx.save();
                 ctx.translate(d.x, d.y);
-
-                // 1. 物理裁剪轮廓
                 ctx.beginPath();
-                ctx.moveTo(dw / 2, 0);
-                ctx.bezierCurveTo(dw, dh * 0.3, dw, dh, dw / 2, dh);
-                ctx.bezierCurveTo(0, dh, 0, dh * 0.3, dw / 2, 0);
+                ctx.moveTo(dw/2, 0);
+                ctx.bezierCurveTo(dw, dh*0.3, dw, dh, dw/2, dh);
+                ctx.bezierCurveTo(0, dh, 0, dh*0.3, dw/2, 0);
                 ctx.closePath();
                 ctx.clip(); 
 
-                // 2. 核心：在水珠里画出【清晰】的背景图，对比外面的模糊
                 if (bgImg.complete) {
-                    ctx.drawImage(bgImg, d.x, d.y, dw * 0.8, dh * 0.8, -dw/2, -dh/2, dw * 2, dh * 2);
+                    ctx.drawImage(bgImg, d.x, d.y, dw*0.5, dh*0.5, -dw/2, -dh/2, dw*2, dh*2);
                 }
 
-                // 3. 质感叠加
-                ctx.globalAlpha = d.isDynamic ? d.s * 5 : 0.4;
+                ctx.globalAlpha = d.isDynamic ? 0.7 : 0.4;
                 ctx.globalCompositeOperation = 'screen';
-                ctx.drawImage(imgAlpha, d.si * sw, d.sj * sh, sw, sh, 0, 0, dw, dh);
+                ctx.drawImage(imgAlpha, d.si*sw, d.sj*sh, sw, sh, 0, 0, dw, dh);
                 ctx.globalCompositeOperation = 'multiply';
-                ctx.drawImage(imgMask, d.si * sw, d.sj * sh, sw, sh, 0, 0, dw, dh);
+                ctx.drawImage(imgMask, d.si*sw, d.sj*sh, sw, sh, 0, 0, dw, dh);
                 ctx.restore();
 
-                // 4. 物理滑落逻辑
                 if (d.isDynamic) {
                     d.wait--;
                     if (d.wait < 0) {
-                        d.v += 0.15; // 重力加速度
-                        d.v *= d.friction; // 摩擦力
-                        d.y += d.v;
-                        
-                        // 模拟走走停停：张力捕捉
-                        if (Math.random() > 0.98) {
-                            d.v *= 0.1;
-                            d.wait = Math.random() * 50;
-                        }
+                        d.v += 0.15; d.v *= d.friction; d.y += d.v;
+                        if (Math.random() > 0.98) { d.v *= 0.1; d.wait = Math.random()*60; }
                     }
                 }
-
                 if (d.y > canvas.height) {
-                    d.y = -dh;
-                    d.x = Math.random() * canvas.width;
-                    d.v = 0;
-                    d.wait = Math.random() * 300;
+                    d.y = -dh; d.x = Math.random()*canvas.width; d.v = 0; d.wait = Math.random()*300;
                 }
             });
             requestAnimationFrame(draw);
@@ -174,10 +185,7 @@
         }
         window.onload = () => {
             setScene('pensive.png', 'contain');
-            resize();
-            draw();
-            setInterval(updateClock, 1000);
-            updateClock();
+            resize(); draw(); setInterval(updateClock, 1000); updateClock();
         };
         window.addEventListener('resize', resize);
     </script>
