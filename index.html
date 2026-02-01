@@ -2,20 +2,20 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Nova's Pensieve - Refined Rain</title>
+    <title>Nova's Pensieve - Dynamic Glass Rain</title>
     <style>
         :root { --glass: rgba(0, 0, 0, 0.6); --border: rgba(255, 255, 255, 0.15); }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "PingFang SC", serif; }
         
-        /* 核心：初始背景带有轻微模糊 */
-        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: background-image 1s; filter: blur(4px) brightness(0.8); }
+        /* 关键：背景加深模糊，让前景水珠像宝石一样浮现 */
+        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: background-image 1s; filter: blur(6px) brightness(0.7); }
         
         #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.3); z-index: 2; pointer-events: none; }
         
         .content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 40px 0; box-sizing: border-box; }
         .nav-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; width: 90%; max-width: 800px; }
-        .nav-card { background: var(--glass); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; text-decoration: none; color: #ccc; backdrop-filter: blur(8px); transition: 0.3s; font-size: 13px; }
+        .nav-card { background: var(--glass); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; text-decoration: none; color: #ccc; backdrop-filter: blur(10px); transition: 0.3s; font-size: 13px; }
         .nav-card:hover { color: white; border-color: rgba(255,255,255,0.5); transform: translateY(-3px); }
         .controls { background: rgba(0, 0, 0, 0.7); padding: 12px 25px; border-radius: 50px; display: flex; align-items: center; gap: 15px; border: 1px solid var(--border); }
         button { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 15px; border-radius: 20px; cursor: pointer; font-size: 11px; }
@@ -89,37 +89,36 @@
             drops = [];
             const density = document.getElementById('den').value;
             for (let i = 0; i < density; i++) {
+                const isDynamic = Math.random() > 0.8; // 20% 是动态下落滴
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
                     si: Math.floor(Math.random() * sprite),
                     sj: Math.floor(Math.random() * sprite),
-                    s: Math.random() * 0.12 + 0.1, 
-                    v: Math.random() * 2 + 1.2,
-                    a: Math.random() * 0.5 + 0.3
+                    s: isDynamic ? (Math.random() * 0.12 + 0.1) : (Math.random() * 0.05 + 0.04), 
+                    v: 0, 
+                    isDynamic: isDynamic,
+                    wait: Math.random() * 200, // 下落前的随机迟疑
+                    friction: Math.random() * 0.05 + 0.94 // 摩擦力模拟
                 });
             }
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            if (!imgMask.complete || !imgAlpha.complete) {
-                requestAnimationFrame(draw);
-                return;
-            }
+            if (!imgMask.complete || !imgAlpha.complete) { requestAnimationFrame(draw); return; }
 
             const sw = imgMask.width / sprite;
             const sh = imgMask.height / sprite;
 
             drops.forEach(d => {
                 const dw = sw * d.s;
-                const dh = dw * 1.6;
+                const dh = dw * 1.5;
 
                 ctx.save();
                 ctx.translate(d.x, d.y);
 
-                // 1. 裁剪物理轮廓
+                // 1. 物理裁剪轮廓
                 ctx.beginPath();
                 ctx.moveTo(dw / 2, 0);
                 ctx.bezierCurveTo(dw, dh * 0.3, dw, dh, dw / 2, dh);
@@ -127,28 +126,40 @@
                 ctx.closePath();
                 ctx.clip(); 
 
-                // 2. 折射效果：在雨滴内画入【清晰】且【放大】的背景
+                // 2. 核心：在水珠里画出【清晰】的背景图，对比外面的模糊
                 if (bgImg.complete) {
-                    // 核心物理模拟：采样区域比显示区域小(0.8倍)，实现凸透镜放大效果
                     ctx.drawImage(bgImg, d.x, d.y, dw * 0.8, dh * 0.8, -dw/2, -dh/2, dw * 2, dh * 2);
                 }
 
-                // 3. 高光与光谱层
-                ctx.globalAlpha = d.a;
+                // 3. 质感叠加
+                ctx.globalAlpha = d.isDynamic ? d.s * 5 : 0.4;
                 ctx.globalCompositeOperation = 'screen';
                 ctx.drawImage(imgAlpha, d.si * sw, d.sj * sh, sw, sh, 0, 0, dw, dh);
-
-                // 4. 阴影层
                 ctx.globalCompositeOperation = 'multiply';
                 ctx.drawImage(imgMask, d.si * sw, d.sj * sh, sw, sh, 0, 0, dw, dh);
-
                 ctx.restore();
 
-                // 下落逻辑
-                d.y += d.v;
+                // 4. 物理滑落逻辑
+                if (d.isDynamic) {
+                    d.wait--;
+                    if (d.wait < 0) {
+                        d.v += 0.15; // 重力加速度
+                        d.v *= d.friction; // 摩擦力
+                        d.y += d.v;
+                        
+                        // 模拟走走停停：张力捕捉
+                        if (Math.random() > 0.98) {
+                            d.v *= 0.1;
+                            d.wait = Math.random() * 50;
+                        }
+                    }
+                }
+
                 if (d.y > canvas.height) {
                     d.y = -dh;
                     d.x = Math.random() * canvas.width;
+                    d.v = 0;
+                    d.wait = Math.random() * 300;
                 }
             });
             requestAnimationFrame(draw);
@@ -157,12 +168,10 @@
         function sync() { audio.volume = document.getElementById('vol').value; }
         function initAudio() { if(audio.paused) { audio.play(); pbtn.innerText = "STOP"; } }
         function toggleAudio(e) { e.stopPropagation(); audio.paused ? audio.play() : audio.pause(); pbtn.innerText = audio.paused ? "PLAY" : "STOP"; }
-        
         function updateClock() {
             const now = new Date();
             document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour12: false});
         }
-
         window.onload = () => {
             setScene('pensive.png', 'contain');
             resize();
