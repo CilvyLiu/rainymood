@@ -8,22 +8,21 @@
     }
 
     function loadImages(images, callback) {
-    var loaded = 0, dict = {};
-    images.forEach(function(item) {
-        var img = new Image();
-        img.onload = function() {
-            dict[item.name] = img;
-            if (++loaded === images.length) callback(dict);
-        };
-        // 关键点：增加 onerror，防止一张图挂掉导致整个冥想盆黑屏
-        img.onerror = function() {
-            console.error("Nova，图片加载失败了，路径是: " + item.src);
-            // 即使失败也继续计数，防止程序彻底卡死
-            if (++loaded === images.length) callback(dict);
-        };
-        img.src = item.src;
-    });
-}
+        var loaded = 0, dict = {};
+        images.forEach(function(item) {
+            var img = new Image();
+            img.onload = function() {
+                dict[item.name] = img;
+                if (++loaded === images.length) callback(dict);
+            };
+            img.onerror = function() {
+                console.error("Nova，资源加载失败了，路径是: " + item.src);
+                if (++loaded === images.length) callback(dict);
+            };
+            // 确保指向根目录
+            img.src = item.src;
+        });
+    }
 
     function Raindrops(width, height, scale, dropAlpha, dropColor) {
         this.width = width;
@@ -84,7 +83,6 @@
         this.gl = this.canvas.getContext('webgl') || this.canvas.getContext('experimental-webgl');
         this.scale = window.devicePixelRatio || 1;
         this.raindrops = new Raindrops(container.clientWidth, container.clientHeight, this.scale, resources.dropAlpha, resources.dropColor);
-        this.parallaxOffset = 0;
         this.init();
     }
 
@@ -134,7 +132,6 @@
 
     RainRenderer.prototype.draw = function() {
         this.raindrops.update(1.0);
-
         var gl = this.gl;
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.raindrops.canvas);
@@ -149,6 +146,7 @@
         requestAnimationFrame(this.draw.bind(this));
     };
 
+    // 资源预加载
     loadImages([
         {name:'dropAlpha', src:'drop-alpha.png'},
         {name:'dropColor', src:'drop-color.png'},
@@ -161,41 +159,33 @@
 
         window.addEventListener('resize', function() { renderer.resize(); });
 
-        container.addEventListener('mousemove', function(e){
-            var rect = container.getBoundingClientRect();
-            var x = (e.clientX - rect.left) / renderer.scale;
-            var y = (e.clientY - rect.top) / renderer.scale;
-            var ctx = renderer.raindrops.ctx;
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.beginPath();
-            ctx.arc(x*renderer.scale, y*renderer.scale, 30*renderer.scale,0,Math.PI*2);
-            ctx.fill();
-            ctx.globalCompositeOperation = 'source-over';
-        });
-
-       // 修改 window.changeScene 函数
+        // Nova，这是同步切换场景与声音的核心逻辑
         window.changeScene = function(sceneUrl) {
-            if (!sceneUrl || sceneUrl === "undefined") {
-                console.error("Nova, 场景路径无效:", sceneUrl);
-                return;
-            }
+            if (!sceneUrl || sceneUrl === "undefined") return;
+
+            // 1. 切换视觉背景
             var img = new Image();
             img.onload = function() {
-                if (window.rainEngine) {
-                    window.rainEngine.updateBackground(img);
-                }
-            };
-            img.onerror = function() {
-                console.error("图片加载失败:", sceneUrl);
+                if (window.rainEngine) window.rainEngine.updateBackground(img);
             };
             img.src = sceneUrl;
+
+            // 2. 同步切换音频 (假设音频文件与图片同名，如 train.png 对应 train.mp3)
+            var audio = document.getElementById('audio');
+            if (audio) {
+                var audioUrl = sceneUrl.split('.')[0] + '.m4a'; // 你使用的是 .m4a 格式
+                audio.src = audioUrl;
+                audio.play().catch(e => console.log("场景切换：等待用户点击以播放音频"));
+                var pbtn = document.getElementById('pbtn');
+                if (pbtn) pbtn.innerText = "⏸";
+            }
         };
-        // 在约 186 行 window.changeScene 的结尾后面添加：
+
         window.initAudio = function() {
             const audio = document.getElementById('audio');
             const pbtn = document.getElementById('pbtn');
             if (audio && audio.paused) {
-                audio.play().catch(e => console.log("音频播放需用户交互:", e));
+                audio.play().catch(e => console.log("初始化：需用户交互"));
                 if (pbtn) pbtn.innerText = "⏸";
             }
         };
