@@ -167,9 +167,21 @@
             ctx.globalCompositeOperation = 'source-over';
         });
 
-        window.changeScene = function(sceneUrl){
+       // 修改 window.changeScene 函数
+        window.changeScene = function(sceneUrl) {
+            if (!sceneUrl || sceneUrl === "undefined") {
+                console.error("Nova, 场景路径无效:", sceneUrl);
+                return;
+            }
             var img = new Image();
-            img.onload = function(){ renderer.updateBackground(img); };
+            img.onload = function() {
+                if (window.rainEngine) {
+                    window.rainEngine.updateBackground(img);
+                }
+            };
+            img.onerror = function() {
+                console.error("图片加载失败:", sceneUrl);
+            };
             img.src = sceneUrl;
         };
     });
