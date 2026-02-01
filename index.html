@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Nova's Pensieve - Refined Rain</title>
+    <title>Nova's Pensieve - Ultra Rain Fixed</title>
     <style>
         :root { --glass: rgba(0, 0, 0, 0.6); --border: rgba(255, 255, 255, 0.15); }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "PingFang SC", serif; }
@@ -62,7 +62,6 @@
         const viewport = document.getElementById('viewport');
         const audio = document.getElementById('audio');
         
-        // 关键素材加载
         const imgMask = new Image(); imgMask.src = 'drop-color.png'; 
         const imgAlpha = new Image(); imgAlpha.src = 'drop-alpha.png'; 
         const bgImg = new Image();
@@ -89,11 +88,11 @@
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    sx: Math.floor(Math.random() * sprite) * (imgMask.width / sprite || 128),
-                    sy: Math.floor(Math.random() * sprite) * (imgMask.height / sprite || 128),
-                    s: Math.random() * 0.15 + 0.1, 
+                    si: Math.floor(Math.random() * sprite),
+                    sj: Math.floor(Math.random() * sprite),
+                    s: Math.random() * 0.12 + 0.08, 
                     v: Math.random() * 2 + 1,
-                    a: Math.random() * 0.5 + 0.2
+                    a: Math.random() * 0.6 + 0.2
                 });
             }
         }
@@ -101,43 +100,44 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 如果核心遮罩没加载好，跳过渲染但继续循环
-            if (!imgMask.complete) { requestAnimationFrame(draw); return; }
+            // 确保核心资源加载
+            if (!imgMask.complete || !imgAlpha.complete) {
+                requestAnimationFrame(draw);
+                return;
+            }
 
             const sw = imgMask.width / sprite;
             const sh = imgMask.height / sprite;
 
             drops.forEach(d => {
                 const dw = sw * d.s;
-                const dh = dw * 1.5; // 仿真：上尖下圆的拉伸
+                const dh = dw * 1.6; // 仿真：上尖下圆
 
                 ctx.save();
                 ctx.translate(d.x, d.y);
-                
-                // 1. 绘制水滴基础轮廓 (防止看不见)
-                ctx.beginPath();
-                ctx.ellipse(dw/2, dh/2, dw/2, dh/2, 0, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-                ctx.fill();
 
-                // 2. 核心：折射背景
+                // --- 1. 定义物理形状 (彻底解决方片问题) ---
+                ctx.beginPath();
+                ctx.moveTo(dw / 2, 0); // 顶部的尖
+                ctx.bezierCurveTo(dw, dh * 0.3, dw, dh, dw / 2, dh); // 右侧圆弧
+                ctx.bezierCurveTo(0, dh, 0, dh * 0.3, dw / 2, 0);   // 左侧圆弧
+                ctx.closePath();
+                ctx.clip(); // 锁定裁剪区，之后画的任何东西都会被裁成雨滴状
+
+                // --- 2. 绘制透明折射 ---
                 if (bgImg.complete) {
-                    ctx.save();
-                    ctx.clip();
-                    // 向上偏移 20 像素产生折射错觉
-                    ctx.drawImage(bgImg, d.x, d.y - 20, dw, dh, 0, 0, dw, dh);
-                    ctx.restore();
+                    // 反向采样背景图，偏移位置模拟透镜折射
+                    ctx.drawImage(bgImg, d.x, d.y, dw * 2, dh * 2, -dw/2, -dh/2, dw * 2, dh * 2);
                 }
 
-                // 3. 应用黑色圆点遮罩 (增加质感和边缘阴影)
+                // --- 3. 混合彩色光泽 (Alpha) ---
                 ctx.globalAlpha = d.a;
-                ctx.globalCompositeOperation = 'multiply'; 
-                ctx.drawImage(imgMask, d.sx, d.sy, sw, sh, 0, 0, dw, dh);
-
-                // 4. 叠加彩色光谱 (调色板颜色)
                 ctx.globalCompositeOperation = 'screen';
-                ctx.globalAlpha = 0.3;
-                ctx.drawImage(imgAlpha, d.sx, d.sy, sw, sh, 0, 0, dw, dh);
+                ctx.drawImage(imgAlpha, d.si * sw, d.sj * sh, sw, sh, 0, 0, dw, dh);
+
+                // --- 4. 混合黑色阴影边缘 (Mask) ---
+                ctx.globalCompositeOperation = 'multiply';
+                ctx.drawImage(imgMask, d.si * sw, d.sj * sh, sw, sh, 0, 0, dw, dh);
 
                 ctx.restore();
 
