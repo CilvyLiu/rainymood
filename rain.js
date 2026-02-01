@@ -88,21 +88,27 @@
     RainRenderer.prototype.resize = function() {
     this.width = window.innerWidth;
     this.height = window.innerHeight;
+    this.ratio = window.devicePixelRatio || 1;
     
-    // 逻辑尺寸
+    // 1. 设置 CSS 逻辑尺寸，防止溢出屏幕
     this.canvas.style.width = this.width + 'px';
     this.canvas.style.height = this.height + 'px';
+    this.canvas.style.position = 'absolute';
+    this.canvas.style.top = '0';
+    this.canvas.style.left = '0';
     
-    // 物理像素尺寸：必须完全一致
+    // 2. 设置物理像素尺寸
     const realW = Math.floor(this.width * this.ratio);
     const realH = Math.floor(this.height * this.ratio);
     
-    this.canvas.width = this.dropCanvas.width = realW;
-    this.canvas.height = this.dropCanvas.height = realH;
+    this.canvas.width = realW;
+    this.canvas.height = realH;
+    this.dropCanvas.width = realW;
+    this.dropCanvas.height = realH;
     
+    // 3. 核心：必须告诉 WebGL 绘制区域的大小，否则背景会错位或溢出
     this.gl.viewport(0, 0, realW, realH);
-};;
-
+};
   RainRenderer.prototype.updateBackground = function(url) {
         const gl = this.gl;
         const img = new Image();
