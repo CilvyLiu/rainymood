@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova's Pensieve - Ultra</title>
+    <title>Nova's Pensieve - Ultra Refraction</title>
     <style>
         :root { --glass: rgba(0, 0, 0, 0.7); --border: rgba(255, 255, 255, 0.15); --gold: #d4af37; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: serif; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: 'Abel', serif; }
 
-        /* 背景层 */
+        /* 背景层：作为折射源 */
         #main-stage {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-size: cover; background-position: center;
@@ -16,10 +16,8 @@
             filter: blur(var(--fog, 2px)) brightness(0.6);
         }
 
-        /* 物理雨滴层 */
         #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
-        /* 侧边导航 */
         .side-nav {
             position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
             display: flex; flex-direction: column; gap: 15px; z-index: 10;
@@ -31,7 +29,6 @@
         }
         .nav-card:hover { color: #fff; border-color: var(--gold); transform: translateX(5px); }
 
-        /* 中央纪律卡片与倒计时 */
         .discipline-center {
             position: absolute; top: 45%; left: 55%; transform: translate(-50%, -50%);
             width: 85%; max-width: 450px; z-index: 10;
@@ -44,9 +41,8 @@
         summary { font-size: 1.1rem; letter-spacing: 5px; cursor: pointer; color: var(--gold); list-style: none; text-align: center; outline: none; }
         .rules { margin-top: 20px; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; }
         
-        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 1.5rem; margin: 10px 0; display: none; }
+        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 2.2rem; margin: 15px 0; display: none; }
 
-        /* 底部控制台 */
         .bottom-bar {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
             background: var(--glass); padding: 10px 30px; border-radius: 50px;
@@ -59,7 +55,7 @@
 </head>
 <body onclick="autoPlay()">
 
-    <div id="main-stage" style="background-image: url('pensive.png');"></div>
+    <div id="main-stage"></div>
     <canvas id="rainCanvas"></canvas>
 
     <div class="side-nav">
@@ -90,7 +86,7 @@
             </select>
         </div>
         <div class="ctrl-item">🔊 <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5" oninput="sync()"></div>
-        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="20" max="100" step="1" value="40" oninput="initRain()"></div>
+        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="10" max="100" step="1" value="40" oninput="initRain()"></div>
         <button id="pbtn" class="play-btn" onclick="toggle(event)">PLAY</button>
     </div>
 
@@ -101,8 +97,8 @@
         const ctx = canvas.getContext('2d');
         const audio = document.getElementById('audio');
         const stage = document.getElementById('main-stage');
-        
-        // 加载你找回的折射贴图
+        const bgImg = new Image();
+
         const dropAlpha = new Image();
         dropAlpha.src = 'https://rainyscope.com/img/drop-alpha.png';
         const dropColor = new Image();
@@ -110,6 +106,12 @@
 
         let drops = [];
         let timerInterval;
+
+        function changeBG() {
+            const src = document.getElementById('bg-select').value;
+            bgImg.src = src;
+            stage.style.backgroundImage = `url(${src})`;
+        }
 
         function resize() {
             canvas.width = window.innerWidth;
@@ -125,65 +127,80 @@
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    s: Math.random() * 0.4 + 0.2, // 缩放比例
-                    v: Math.random() * 0.5 + 0.2, // 下滑速度
-                    a: Math.random() * 0.5 + 0.3  // 透明度
+                    s: Math.random() * 0.3 + 0.2, 
+                    v: Math.random() * 0.5 + 0.2, 
+                    a: Math.random() * 0.5 + 0.3  
                 });
             }
         }
 
-        // 核心渲染：模拟物理折射
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drops.forEach(d => {
+                const w = dropAlpha.width * d.s;
+                const h = dropAlpha.height * d.s;
+
                 ctx.save();
+                ctx.translate(d.x, d.y);
+                
+                // 第一步：绘制 Alpha 通道作为“容器形状”
                 ctx.globalAlpha = d.a;
-                // 使用 Alpha 通道渲染形状
-                ctx.drawImage(dropAlpha, d.x, d.y, dropAlpha.width * d.s, dropAlpha.height * d.s);
-                // 使用 Color 通道增加叠加折射感
+                ctx.drawImage(dropAlpha, 0, 0, w, h);
+
+                // 第二步：使用 source-in 模式将背景图位移注入
+                ctx.globalCompositeOperation = 'source-in';
+                ctx.save();
+                // 模拟折射：背景坐标偏移 (偏移 15 像素模拟凸透镜感)
+                ctx.translate(-d.x, -d.y + 15);
+                ctx.filter = 'brightness(1.1) blur(0.5px)';
+                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
+
+                // 第三步：叠加彩色光泽 (Color 层)
                 ctx.globalCompositeOperation = 'overlay';
-                ctx.drawImage(dropColor, d.x, d.y, dropColor.width * d.s, dropColor.height * d.s);
+                ctx.globalAlpha = 0.4;
+                ctx.drawImage(dropColor, 0, 0, w, h);
+
                 ctx.restore();
 
                 d.y += d.v;
                 if (d.y > canvas.height) {
-                    d.y = -100;
+                    d.y = -h;
                     d.x = Math.random() * canvas.width;
                 }
             });
             requestAnimationFrame(draw);
         }
 
-        // 倒计时拦截逻辑
         function startIntercept(sec) {
             const box = document.getElementById('timer-box');
             box.style.display = 'block';
             let timeLeft = sec;
-            
             if(timerInterval) clearInterval(timerInterval);
-            
             timerInterval = setInterval(() => {
                 const m = Math.floor(timeLeft / 60);
                 const s = timeLeft % 60;
                 box.innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
                 if(timeLeft <= 0) {
                     clearInterval(timerInterval);
-                    box.innerText = "CALM ACHIEVED";
+                    box.innerText = "ZEN";
                 }
                 timeLeft--;
             }, 1000);
         }
 
         function sync() { audio.volume = document.getElementById('vol').value; }
-        function changeBG() { stage.style.backgroundImage = `url("${document.getElementById('bg-select').value}")`; }
         function toggle(e) { 
             e.stopPropagation(); 
             audio.paused ? (audio.play(), pbtn.innerText="STOP") : (audio.pause(), pbtn.innerText="PLAY");
         }
-        function autoPlay() { if(audio.paused) audio.play().then(()=>pbtn.innerText="STOP"); }
+        function autoPlay() { if(audio.paused) audio.play().then(()=>pbtn.innerText="STOP").catch(()=>{}); }
 
         window.addEventListener('resize', resize);
-        window.onload = () => { resize(); draw(); };
+        window.onload = () => { 
+            changeBG();
+            bgImg.onload = () => { resize(); draw(); };
+        };
     </script>
 </body>
 </html>
