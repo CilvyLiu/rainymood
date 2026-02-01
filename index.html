@@ -1,146 +1,177 @@
-import streamlit as st
-import base64
-from pathlib import Path
-from datetime import datetime, timedelta, timezone
-
-# ===================== 1. 基础配置 =====================
-st.set_page_config(page_title="Nova's Pensieve", layout="wide", initial_sidebar_state="collapsed")
-
-TZ_CHINA = timezone(timedelta(hours=8))
-now_china = datetime.now(timezone.utc).astimezone(TZ_CHINA)
-
-def get_base64(file_path):
-    try:
-        if Path(file_path).exists():
-            with open(file_path, "rb") as f:
-                return base64.b64encode(f.read()).decode()
-        return ""
-    except: return ""
-
-# ===================== 2. 核心架构注入 =====================
-def inject_pensieve_system(bg_file, audio_file):
-    bg_base64 = get_base64(bg_file)
-    audio_base64 = get_base64(audio_file)
-    is_pensieve = "pensieve" in bg_file
-    
-    # 动态背景样式
-    bg_style = f"""
-        background: url("data:image/gif;base64,{bg_base64}");
-        background-repeat: no-repeat;
-        background-position: center;
-        background-size: {"400px" if is_pensieve else "cover"};
-        background-color: black;
-    """
-
-    st.markdown(f"""
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova's Pensieve</title>
     <style>
-    .stApp {{
-        {bg_style}
-        transition: all 1.5s ease-in-out;
-    }}
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: black; color: white; overflow: hidden; font-family: serif; }
+        
+        /* 核心背景层 */
+        #bg-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            transition: all 1.5s ease-in-out;
+            background-repeat: no-repeat;
+            background-position: center;
+            z-index: -3;
+        }
 
-    /* 雨滴玻璃滤镜 - 全屏叠加 */
-    .stApp::after {{
-        content: "";
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background-image: url("https://www.transparenttextures.com/patterns/glass-pass.png");
-        opacity: 0.25;
-        pointer-events: none;
-        z-index: 1;
-    }}
+        /* 调色蒙版 */
+        #mask {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            transition: all 1.5s ease-in-out;
+            z-index: -2;
+        }
 
-    /* 调色蒙版 */
-    .stApp::before {{
-        content: "";
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background: {"rgba(0,0,0,0.8)" if is_pensieve else "rgba(10, 20, 30, 0.4)"};
-        backdrop-filter: brightness(0.7);
-        z-index: -1;
-    }}
+        /* 雨滴玻璃滤镜 */
+        #rain-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("https://www.transparenttextures.com/patterns/glass-pass.png");
+            opacity: 0.25;
+            pointer-events: none;
+            z-index: -1;
+        }
 
-    /* 导航卡片 */
-    .nav-card {{
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        transition: 0.4s;
-        text-decoration: none !important;
-        color: white !important;
-        backdrop-filter: blur(10px);
-        display: block;
-    }}
-    .nav-card:hover {{
-        background: rgba(0, 212, 255, 0.1);
-        border: 1px solid #00d4ff;
-        transform: translateY(-5px);
-    }}
+        /* UI 容器 */
+        .container {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: space-between; height: 100vh; padding: 40px 0;
+            box-sizing: border-box; z-index: 10; position: relative;
+        }
 
-    header, footer {{visibility: hidden;}}
+        .header h2 { letter-spacing: 10px; opacity: 0.7; margin: 0; }
+        .header p { color: #555; font-size: 12px; margin-top: 5px; }
+
+        /* 功能卡片 */
+        .nav-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 20px; width: 90%; max-width: 900px;
+        }
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px; padding: 20px;
+            text-align: center; text-decoration: none; color: white;
+            backdrop-filter: blur(10px); transition: 0.4s;
+        }
+        .nav-card:hover { border-color: #00d4ff; transform: translateY(-5px); background: rgba(0, 212, 255, 0.1); }
+
+        /* Rainymood 调节器样式 */
+        .audio-controls {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 25px; border-radius: 40px;
+            display: flex; align-items: center; gap: 20px;
+            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);
+        }
+        .slider-group { display: flex; align-items: center; gap: 10px; }
+        input[type=range] { cursor: pointer; accent-color: #00d4ff; }
+
+        /* 底部场景切换 */
+        .scene-switcher { display: flex; gap: 10px; margin-top: 20px; }
+        button {
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
+            color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; transition: 0.3s;
+        }
+        button:hover { background: rgba(0,212,255,0.2); border-color: #00d4ff; }
     </style>
-    
-    <audio autoplay loop id="rainAudio">
-        <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
-    </audio>
-    
+</head>
+<body onclick="initAudio()">
+
+    <div id="bg-layer"></div>
+    <div id="mask"></div>
+    <div id="rain-overlay"></div>
+
+    <div class="container">
+        <div class="header" style="text-align: center;">
+            <h2>THE PENSIEVE</h2>
+            <p id="clock"></p>
+        </div>
+
+        <div class="nav-grid">
+            <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card"><h2>🏦</h2><div style="font-size:14px;">古灵阁</div></a>
+            <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card"><h2>🐾</h2><div style="font-size:14px;">嗅嗅探测</div></a>
+            <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card"><h2>📜</h2><div style="font-size:14px;">预言日报</div></a>
+            <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card"><h2>🔮</h2><div style="font-size:14px;">战略看板</div></a>
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 20px;">
+            <div class="audio-controls">
+                <div class="slider-group">
+                    <span>🔊音量</span>
+                    <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.5" oninput="updateAudio()">
+                </div>
+                <div class="slider-group">
+                    <span>🌧️雨点</span>
+                    <input type="range" id="rainSlider" min="0" max="0.8" step="0.01" value="0.25" oninput="updateRain()">
+                </div>
+                <button onclick="toggleAudio()" id="playBtn">🔇 停止</button>
+            </div>
+
+            <div class="scene-switcher">
+                <button onclick="setScene('pensieve.png', '400px', 0.8)">🏺 冥想盆</button>
+                <button onclick="setScene('train.png', 'cover', 0.4)">🚂 火车</button>
+                <button onclick="setScene('window.png', 'cover', 0.4)">🪟 落地窗</button>
+                <button onclick="setScene('beach.png', 'cover', 0.4)">🏖️ 沙滩</button>
+                <button onclick="setScene('mountain.png', 'cover', 0.4)">⛰️ 山顶</button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="rainAudio" loop src="0.m4a"></audio>
+
     <script>
-        var audio = document.getElementById("rainAudio");
-        audio.volume = 0.5;
-        // 核心交互：点击屏幕任何地方播放雨声
-        document.addEventListener('click', function() {{
-            audio.play();
-        }});
+        const audio = document.getElementById('rainAudio');
+        const bgLayer = document.getElementById('bg-layer');
+        const mask = document.getElementById('mask');
+        const rainOverlay = document.getElementById('rain-overlay');
+        const volSlider = document.getElementById('volSlider');
+        const rainSlider = document.getElementById('rainSlider');
+        const playBtn = document.getElementById('playBtn');
+
+        // 初始化场景
+        function setScene(img, size, brightness) {
+            bgLayer.style.backgroundImage = `url('${img}')`;
+            bgLayer.style.backgroundSize = size;
+            mask.style.backgroundColor = `rgba(0, 0, 0, ${brightness})`;
+        }
+
+        // 音频控制
+        function initAudio() {
+            if (audio.paused) {
+                audio.play().catch(e => console.log("等待交互播放"));
+                playBtn.innerText = "🔊 播放中";
+            }
+        }
+
+        function updateAudio() {
+            audio.volume = volSlider.value;
+        }
+
+        function toggleAudio() {
+            if (audio.paused) {
+                audio.play();
+                playBtn.innerText = "🔊 播放中";
+            } else {
+                audio.pause();
+                playBtn.innerText = "🔇 已停止";
+            }
+        }
+
+        // 雨点强度控制 (调节滤镜透明度)
+        function updateRain() {
+            rainOverlay.style.opacity = rainSlider.value;
+        }
+
+        // 时钟
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai', hour12: false}) + " CST";
+        }
+
+        // 默认启动
+        setScene('pensieve.png', '400px', 0.8);
+        setInterval(updateClock, 1000);
+        updateClock();
     </script>
-    """, unsafe_allow_html=True)
-
-# ===================== 3. 场景逻辑 =====================
-SCENE_FILES = {
-    "🏺 冥想盆": "pensieve.png",
-    "🚂 火车": "train.png",
-    "🪟 落地窗": "window.png",
-    "🏖️ 沙滩": "beach.png",
-    "⛰️ 山顶": "mountain.png"
-}
-
-if "current_scene_file" not in st.session_state:
-    st.session_state.current_scene_file = SCENE_FILES["🏺 冥想盆"]
-
-inject_pensieve_system(st.session_state.current_scene_file, "0.m4a")
-
-# ===================== 4. UI 布局 =====================
-# 顶部标题
-st.markdown(f"<h2 style='text-align: center; color: white; font-family: serif; letter-spacing: 10px; opacity: 0.7;'>THE PENSIEVE</h2>", unsafe_allow_html=True)
-st.markdown(f"<p style='text-align: center; color: #555; font-size: 12px;'>{now_china.strftime('%H:%M:%S')} CST</p>", unsafe_allow_html=True)
-
-# 留出中间背景区域（冥想盆位置）
-st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
-
-# 功能卡片
-cols = st.columns(4)
-links = [
-    ("🏦", "古灵阁", "https://gringott.streamlit.app/"),
-    ("🐾", "嗅嗅探测", "https://wwskygazer.streamlit.app/"),
-    ("📜", "预言日报", "https://newscil.streamlit.app/"),
-    ("🔮", "战略看板", "https://skygazer111.streamlit.app/")
-]
-
-for i, (emoji, name, url) in enumerate(links):
-    with cols[i]:
-        st.markdown(f"""
-        <a href="{url}" target="_blank" class="nav-card">
-            <h2 style="margin:0;">{emoji}</h2>
-            <div style="font-size: 14px; margin-top:5px; letter-spacing:2px;">{name}</div>
-        </a>
-        """, unsafe_allow_html=True)
-
-# 底部环境切换
-st.markdown("<br><br>", unsafe_allow_html=True)
-with st.expander("✨ 调谐冥想环境"):
-    sc_btns = st.columns(len(SCENE_FILES))
-    for i, (name, file) in enumerate(SCENE_FILES.items()):
-        if sc_btns[i].button(name):
-            st.session_state.current_scene_file = file
-            st.rerun()
+</body>
+</html>
