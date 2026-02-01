@@ -5,89 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nova's Pensieve</title>
     <style>
-        :root { --glass: rgba(0, 0, 0, 0.75); --border: rgba(255, 255, 255, 0.15); --gold: #d4af37; }
+        :root { --glass: rgba(0, 0, 0, 0.7); --border: rgba(255, 255, 255, 0.15); --gold: #d4af37; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: serif; }
 
+        /* 背景层：淡入淡出效果 */
         #main-stage {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: url("pensive.png") center center no-repeat;
-            background-size: cover; z-index: 1;
+            background-size: cover; background-position: center;
+            z-index: 1; transition: background-image 0.8s ease-in-out;
         }
 
-        /* --- 核心优化：大颗透明雨滴层 --- */
-        #rain-viewport {
-            position: absolute; width: 100%; height: 100%;
-            z-index: 3;
-            /* 关键：使用 overlay 混合模式实现“透明感”，不再是白圈 */
-            mix-blend-mode: overlay;
-            pointer-events: none;
-        }
+        /* Canvas 雨滴 */
+        #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
 
-        .drop-layer {
-            position: absolute; top: -100%; left: 0; width: 100%; height: 200%;
-            background: url("stardust.png") repeat;
-            /* 增加亮度滤镜和轻微模糊，模拟水珠边缘 */
-            filter: brightness(2) contrast(1.2) blur(1px); 
-            animation: gravity-fall 4s linear infinite;
-        }
-
-        @keyframes gravity-fall {
-            from { transform: translateY(-30%); }
-            to { transform: translateY(0%); }
-        }
-
-        /* 侧边导航栏 (左侧) */
+        /* 侧边功能栏 */
         .side-nav {
             position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
             display: flex; flex-direction: column; gap: 15px; z-index: 10;
         }
         .nav-card {
             background: var(--glass); border: 1px solid var(--border);
-            padding: 15px 10px; border-radius: 12px; text-decoration: none; color: #aaa;
-            backdrop-filter: blur(10px); transition: 0.3s; width: 75px; text-align: center; font-size: 12px;
+            padding: 12px 8px; border-radius: 12px; text-decoration: none; color: #888;
+            backdrop-filter: blur(10px); transition: 0.3s; width: 60px; text-align: center; font-size: 11px;
         }
         .nav-card:hover { color: #fff; border-color: var(--gold); transform: translateX(5px); }
 
         /* 中央纪律卡片 */
         .discipline-center {
             position: absolute; top: 45%; left: 55%; transform: translate(-50%, -50%);
-            width: 85%; max-width: 480px; z-index: 10;
+            width: 85%; max-width: 450px; z-index: 10;
         }
         details {
             background: rgba(10, 15, 25, 0.85); border: 1px solid var(--gold);
-            padding: 25px; border-radius: 20px; backdrop-filter: blur(15px);
+            padding: 25px; border-radius: 20px; backdrop-filter: blur(20px);
             box-shadow: 0 30px 60px rgba(0,0,0,0.8);
         }
-        summary {
-            font-size: 1.1rem; letter-spacing: 6px; cursor: pointer; color: var(--gold);
-            list-style: none; text-align: center; font-weight: 200; outline: none;
-        }
-        .rules {
-            margin-top: 25px; text-align: left; line-height: 2.2; color: #ccc;
-            font-size: 0.95rem; border-top: 1px solid var(--border); padding-top: 20px;
-        }
-        .rules b { color: #fff; font-weight: 500; border-bottom: 1px solid #444; }
+        summary { font-size: 1rem; letter-spacing: 5px; cursor: pointer; color: var(--gold); list-style: none; text-align: center; outline: none; }
+        .rules { margin-top: 20px; text-align: left; line-height: 1.8; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; }
 
         /* 底部控制台 */
         .bottom-bar {
-            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-            background: var(--glass); padding: 12px 30px; border-radius: 50px;
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: var(--glass); padding: 10px 30px; border-radius: 50px;
             display: flex; gap: 20px; align-items: center; z-index: 10; border: 1px solid var(--border);
         }
-        input[type=range] { accent-color: var(--gold); width: 100px; cursor: pointer; }
-        .play-btn { background: none; border: 1px solid #fff; color: #fff; border-radius: 20px; padding: 6px 18px; cursor: pointer; font-size: 12px; }
+        .ctrl-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #999; }
+        select, input[type=range] { background: #222; border: 1px solid var(--border); color: white; border-radius: 5px; cursor: pointer; }
+        input[type=range] { accent-color: var(--gold); width: 70px; }
+        .play-btn { background: none; border: 1px solid #fff; color: #fff; border-radius: 20px; padding: 4px 15px; cursor: pointer; font-size: 11px; }
     </style>
 </head>
 <body onclick="autoPlay()">
 
-    <div id="main-stage">
-        <div id="rain-viewport">
-            <div id="rain-drops" class="drop-layer"></div>
-        </div>
-    </div>
+    <div id="main-stage"></div>
+    <canvas id="rainCanvas"></canvas>
 
     <div class="side-nav">
-        <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card">🏦<br>古灵阁</a>
+        <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card">🏦<br>古灵</a>
         <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card">🐾<br>嗅嗅</a>
         <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card">📜<br>日报</a>
         <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card">🔮<br>看板</a>
@@ -95,48 +69,92 @@
 
     <div class="discipline-center">
         <details open>
-            <summary>✧ NOVA'S DISCIPLINE ✧</summary>
+            <summary>✧ DISCIPLINE ✧</summary>
             <div class="rules">
-                1. <b>情绪拦截</b>：若有焦虑，强制观看水滴 5 分钟，直至心跳平稳。<br>
-                2. <b>信号至上</b>：看板未现“🚀 强势脉冲”或“🧱 锁仓”，绝不手动开仓。<br>
-                3. <b>保护机制</b>：古灵阁冷却触发时，严禁劫持系统强制买入。<br>
-                4. <b>穿透审计</b>：忽视股吧噪音，只看 REPORT 里的资金真实血统。<br>
-                5. <b>分批压仓</b>：严格执行建议规模，保留回旋余地。
+                1. <b>情绪拦截</b>：焦虑时，强制观察雨水 5 分钟。<br>
+                2. <b>信号确认</b>：看板无强力信号，绝不动手。<br>
+                3. <b>保护机制</b>：古灵阁冷却期间，严禁强制交易。<br>
+                4. <b>穿透审计</b>：不听杂音，只看资金血统。<br>
+                5. <b>分批压仓</b>：严格执行规模，不孤注一掷。
             </div>
         </details>
     </div>
 
     <div class="bottom-bar">
-        <span>🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
-        <span>🌧️ <input type="range" id="rain-size" min="100" max="1000" step="10" value="450" oninput="sync()"></span>
+        <div class="ctrl-item">🖼️ 
+            <select id="bg-select" onchange="changeBG()">
+                <option value="pensive.png">1</option>
+                <option value="beach.png">2</option>
+                <option value="mountain.png">3</option>
+                <option value="train.png">4</option>
+                <option value="window.png">5</option>
+            </select>
+        </div>
+        <div class="ctrl-item">🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></div>
+        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="20" max="400" step="10" value="120" oninput="initRain()"></div>
         <button id="pbtn" class="play-btn" onclick="toggle(event)">PLAY</button>
     </div>
 
     <audio id="audio" loop src="0.m4a"></audio>
 
     <script>
+        const canvas = document.getElementById('rainCanvas');
+        const ctx = canvas.getContext('2d');
         const audio = document.getElementById('audio');
-        const drops = document.getElementById('rain-drops');
-        const pbtn = document.getElementById('pbtn');
+        const stage = document.getElementById('main-stage');
+        let raindrops = [];
 
-        function sync() {
-            audio.volume = document.getElementById('vol').value;
-            const size = document.getElementById('rain-size').value;
-            drops.style.backgroundSize = size + "px";
-            
-            // 修正：不再强制模糊，而是让亮点变大，配合 overlay 产生透明水珠感
-            const opac = 0.3 + (size / 1500);
-            drops.style.opacity = opac;
+        function changeBG() {
+            const file = document.getElementById('bg-select').value;
+            stage.style.backgroundImage = `url("${file}")`;
         }
 
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            initRain();
+        }
+
+        function initRain() {
+            raindrops = [];
+            const density = document.getElementById('rain-den').value;
+            for (let i = 0; i < density; i++) {
+                raindrops.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    l: Math.random() * 25 + 10,
+                    v: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+            ctx.lineWidth = 1;
+            ctx.lineCap = 'round';
+
+            raindrops.forEach(r => {
+                ctx.beginPath();
+                ctx.moveTo(r.x, r.y);
+                ctx.lineTo(r.x, r.y + r.l);
+                ctx.stroke();
+                r.y += r.v;
+                if (r.y > canvas.height) { r.y = -r.l; r.x = Math.random() * canvas.width; }
+            });
+            requestAnimationFrame(draw);
+        }
+
+        function sync() { audio.volume = document.getElementById('vol').value; }
         function toggle(e) {
             e.stopPropagation();
             if(audio.paused) { audio.play(); pbtn.innerText = "STOP"; }
             else { audio.pause(); pbtn.innerText = "PLAY"; }
         }
-
         function autoPlay() { if(audio.paused) audio.play().then(()=>pbtn.innerText="STOP").catch(()=>{}); }
-        window.onload = sync;
+
+        window.addEventListener('resize', resize);
+        window.onload = () => { changeBG(); resize(); draw(); };
     </script>
 </body>
 </html>
