@@ -4,34 +4,38 @@
     <meta charset="UTF-8">
     <title>Nova's Pensieve</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #050505; color: white; overflow: hidden; font-family: serif; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; color: white; overflow: hidden; font-family: serif; }
         
+        /* 背景层：确保图片在最底层且可见 */
         #bg-layer {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            transition: opacity 1s; background-repeat: no-repeat; background-position: center;
-            z-index: -3; opacity: 1;
+            background-repeat: no-repeat; background-position: center;
+            z-index: -5; transition: background 1s;
         }
 
+        /* 蒙版层：调亮，防止全黑 */
         #mask {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); z-index: -2;
+            background: rgba(0,0,0,0.4); z-index: -4;
         }
 
+        /* 雨点层：确保 stardust.png 能透出来 */
         #rain-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-image: url("stardust.png");
-            opacity: 0.3; pointer-events: none; z-index: -1;
+            background-repeat: repeat;
+            opacity: 0.5; pointer-events: none; z-index: -3;
         }
 
         .container { display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 100vh; padding: 30px 0; box-sizing: border-box; }
-        .nav-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; width: 90%; max-width: 800px; }
-        .nav-card { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; text-align: center; text-decoration: none; color: white; backdrop-filter: blur(5px); }
+        .nav-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 90%; max-width: 800px; }
+        .nav-card { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 10px; text-align: center; text-decoration: none; color: white; backdrop-filter: blur(5px); }
         
-        .controls { background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 40px; display: flex; align-items: center; gap: 20px; border: 1px solid rgba(255,255,255,0.2); }
-        button { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; }
+        .controls { background: rgba(0,0,0,0.7); padding: 15px 25px; border-radius: 40px; display: flex; align-items: center; gap: 15px; border: 1px solid rgba(255,255,255,0.3); }
+        button { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; }
     </style>
 </head>
-<body onclick="playMusic()">
+<body onclick="start()">
 
     <div id="bg-layer"></div>
     <div id="mask"></div>
@@ -39,29 +43,29 @@
 
     <div class="container">
         <div style="text-align: center;">
-            <h1 style="letter-spacing: 10px; margin: 0;">THE PENSIEVE</h1>
-            <p id="clock" style="color: #444; font-size: 12px;"></p>
+            <h1 style="letter-spacing: 8px; margin: 0;">THE PENSIEVE</h1>
+            <p id="clock" style="font-size: 12px; opacity: 0.5;"></p>
         </div>
 
         <div class="nav-grid">
-            <a href="https://gringott.streamlit.app/" class="nav-card"><h2>🏦</h2><div>古灵阁</div></a>
-            <a href="https://wwskygazer.streamlit.app/" class="nav-card"><h2>🐾</h2><div>嗅嗅探测</div></a>
-            <a href="https://newscil.streamlit.app/" class="nav-card"><h2>📜</h2><div>预言日报</div></a>
-            <a href="https://skygazer111.streamlit.app/" class="nav-card"><h2>🔮</h2><div>战略看板</div></a>
+            <a href="https://gringott.streamlit.app/" class="nav-card">古灵阁</a>
+            <a href="https://wwskygazer.streamlit.app/" class="nav-card">嗅嗅探测</a>
+            <a href="https://newscil.streamlit.app/" class="nav-card">预言日报</a>
+            <a href="https://skygazer111.streamlit.app/" class="nav-card">战略看板</a>
         </div>
 
         <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
             <div class="controls">
                 <span>🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
-                <span>🌧️ <input type="range" id="rain" min="0" max="1" step="0.1" value="0.3" oninput="sync()"></span>
-                <button onclick="toggleAudio(event)" id="btn">🔇 播放</button>
+                <span>🌧️ <input type="range" id="rain" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
+                <button onclick="toggle(event)" id="btn">🔇 播放</button>
             </div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-                <button onclick="changeScene('pensive.png', '450px', 0.8)">🏺 冥想盆</button>
-                <button onclick="changeScene('train.png', 'cover', 0.5)">🚂 火车</button>
-                <button onclick="changeScene('window.png', 'cover', 0.5)">🪟 落地窗</button>
-                <button onclick="changeScene('beach.png', 'cover', 0.5)">🏖️ 沙滩</button>
-                <button onclick="changeScene('mountain.png', 'cover', 0.5)">⛰️ 山顶</button>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                <button onclick="change('pensive.png', '500px')">🏺 冥想盆</button>
+                <button onclick="change('train.png', 'cover')">🚂 火车</button>
+                <button onclick="change('window.png', 'cover')">🪟 落地窗</button>
+                <button onclick="change('beach.png', 'cover')">🏖️ 沙滩</button>
+                <button onclick="change('mountain.png', 'cover')">⛰️ 山顶</button>
             </div>
         </div>
     </div>
@@ -72,24 +76,11 @@
         const audio = document.getElementById('audio');
         const bg = document.getElementById('bg-layer');
         const rain = document.getElementById('rain-overlay');
-        const mask = document.getElementById('mask');
 
-        function changeScene(img, size, dark) {
-            console.log("尝试加载图片:", img);
-            // 强制重新生成 URL，防止缓存
-            const finalUrl = img + "?v=" + new Date().getTime();
-            bg.style.backgroundImage = "url('" + finalUrl + "')";
+        function change(img, size) {
+            console.log("切换场景:", img);
+            bg.style.backgroundImage = "url('" + img + "')";
             bg.style.backgroundSize = size;
-            mask.style.backgroundColor = "rgba(0,0,0," + dark + ")";
-            
-            // 调试：检查图片是否真的加载了
-            const tester = new Image();
-            tester.onload = () => console.log("加载成功: " + img);
-            tester.onerror = () => {
-                console.error("加载失败: " + img);
-                alert("无法找到图片: " + img + "\n请检查文件名大小写是否完全一致！");
-            };
-            tester.src = img;
         }
 
         function sync() {
@@ -97,20 +88,26 @@
             rain.style.opacity = document.getElementById('rain').value;
         }
 
-        function playMusic() { if(audio.paused) audio.play(); document.getElementById('btn').innerText="🔊 播放中"; }
-
-        function toggleAudio(e) {
-            e.stopPropagation();
-            if(audio.paused) { audio.play(); document.getElementById('btn').innerText="🔊 播放中"; }
-            else { audio.pause(); document.getElementById('btn').innerText="🔇 停止"; }
+        function start() {
+            if(audio.paused) {
+                audio.play().catch(e => {});
+                document.getElementById('btn').innerText = "🔊 播放中";
+            }
         }
 
-        setInterval(() => {
-            document.getElementById('clock').innerText = new Date().toLocaleString();
-        }, 1000);
+        function toggle(e) {
+            e.stopPropagation();
+            if(audio.paused) { audio.play(); document.getElementById('btn').innerText = "🔊 播放中"; }
+            else { audio.pause(); document.getElementById('btn').innerText = "🔇 停止"; }
+        }
 
-        // 初始加载
-        window.onload = () => { changeScene('pensive.png', '450px', 0.8); };
+        setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
+
+        // 初始加载：直接暴力设置背景
+        window.onload = () => { 
+            change('pensive.png', '500px');
+            sync();
+        };
     </script>
 </body>
 </html>
