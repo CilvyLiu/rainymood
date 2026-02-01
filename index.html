@@ -3,23 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova's Pensieve</title>
+    <title>Nova's Pensieve - Ultra</title>
     <style>
         :root { --glass: rgba(0, 0, 0, 0.7); --border: rgba(255, 255, 255, 0.15); --gold: #d4af37; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: serif; }
 
-        /* 背景层：自带基础水汽感 */
+        /* 背景层 */
         #main-stage {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-size: cover; background-position: center;
             z-index: 1; transition: background-image 0.8s ease;
-            filter: blur(var(--fog, 2px)) brightness(0.8);
+            filter: blur(var(--fog, 2px)) brightness(0.6);
         }
 
-        /* Canvas 物理雨滴层 */
+        /* 物理雨滴层 */
         #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
-        /* 侧边功能栏 */
+        /* 侧边导航 */
         .side-nav {
             position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
             display: flex; flex-direction: column; gap: 15px; z-index: 10;
@@ -31,18 +31,20 @@
         }
         .nav-card:hover { color: #fff; border-color: var(--gold); transform: translateX(5px); }
 
-        /* 中央纪律卡片 */
+        /* 中央纪律卡片与倒计时 */
         .discipline-center {
             position: absolute; top: 45%; left: 55%; transform: translate(-50%, -50%);
             width: 85%; max-width: 450px; z-index: 10;
         }
         details {
-            background: rgba(10, 15, 25, 0.85); border: 1px solid var(--gold);
+            background: rgba(10, 15, 25, 0.9); border: 1px solid var(--gold);
             padding: 25px; border-radius: 20px; backdrop-filter: blur(25px);
             box-shadow: 0 30px 60px rgba(0,0,0,0.8);
         }
-        summary { font-size: 1rem; letter-spacing: 5px; cursor: pointer; color: var(--gold); list-style: none; text-align: center; outline: none; }
-        .rules { margin-top: 20px; text-align: left; line-height: 1.8; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; }
+        summary { font-size: 1.1rem; letter-spacing: 5px; cursor: pointer; color: var(--gold); list-style: none; text-align: center; outline: none; }
+        .rules { margin-top: 20px; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; }
+        
+        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 1.5rem; margin: 10px 0; display: none; }
 
         /* 底部控制台 */
         .bottom-bar {
@@ -51,14 +53,13 @@
             display: flex; gap: 20px; align-items: center; z-index: 10; border: 1px solid var(--border);
         }
         .ctrl-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #999; }
-        select, input[type=range] { background: #222; border: 1px solid var(--border); color: white; border-radius: 5px; cursor: pointer; }
-        input[type=range] { accent-color: var(--gold); width: 70px; }
-        .play-btn { background: none; border: 1px solid #fff; color: #fff; border-radius: 20px; padding: 4px 15px; cursor: pointer; font-size: 11px; }
+        input[type=range] { accent-color: var(--gold); width: 80px; }
+        .play-btn { background: none; border: 1px solid var(--gold); color: var(--gold); border-radius: 20px; padding: 5px 20px; cursor: pointer; font-size: 11px; }
     </style>
 </head>
 <body onclick="autoPlay()">
 
-    <div id="main-stage"></div>
+    <div id="main-stage" style="background-image: url('pensive.png');"></div>
     <canvas id="rainCanvas"></canvas>
 
     <div class="side-nav">
@@ -71,28 +72,25 @@
     <div class="discipline-center">
         <details open>
             <summary>✧ DISCIPLINE ✧</summary>
-            <div class="rules">
-                1. <b>情绪拦截</b>：产生焦虑时，观察真实雨滴动态 5 分钟。<br>
+            <div id="timer-box">05:00</div>
+            <div class="rules" id="rule-content">
+                1. <b>情绪拦截</b>：产生焦虑时，启动拦截倒计时。<br>
                 2. <b>信号确认</b>：看板未现强力突破，绝不动手。<br>
                 3. <b>保护机制</b>：古灵阁冷却期间，严禁劫持系统。<br>
-                4. <b>穿透审计</b>：忽视噪音，只看 REPORT 里的资金真实血统。<br>
-                5. <b>分批压仓</b>：按建议规模执行，不孤注一掷。
+                <button class="play-btn" style="width:100%; margin-top:15px;" onclick="startIntercept(300)">启动 5 分钟冷静拦截</button>
             </div>
         </details>
     </div>
 
     <div class="bottom-bar">
         <div class="ctrl-item">🖼️ 
-            <select id="bg-select" onchange="changeBG()">
-                <option value="pensive.png">1</option>
-                <option value="beach.png">2</option>
-                <option value="mountain.png">3</option>
-                <option value="train.png">4</option>
-                <option value="window.png">5</option>
+            <select id="bg-select" onchange="changeBG()" style="background:#000; color:white; border:none;">
+                <option value="pensive.png">Pensive</option>
+                <option value="train.png">Express</option>
             </select>
         </div>
-        <div class="ctrl-item">🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></div>
-        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="10" max="150" step="5" value="50" oninput="initRain()"></div>
+        <div class="ctrl-item">🔊 <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5" oninput="sync()"></div>
+        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="20" max="100" step="1" value="40" oninput="initRain()"></div>
         <button id="pbtn" class="play-btn" onclick="toggle(event)">PLAY</button>
     </div>
 
@@ -103,12 +101,15 @@
         const ctx = canvas.getContext('2d');
         const audio = document.getElementById('audio');
         const stage = document.getElementById('main-stage');
-        let drops = [];
+        
+        // 加载你找回的折射贴图
+        const dropAlpha = new Image();
+        dropAlpha.src = 'https://rainyscope.com/img/drop-alpha.png';
+        const dropColor = new Image();
+        dropColor.src = 'https://rainyscope.com/img/drop-color.png';
 
-        function changeBG() {
-            const file = document.getElementById('bg-select').value;
-            stage.style.backgroundImage = `url("${file}")`;
-        }
+        let drops = [];
+        let timerInterval;
 
         function resize() {
             canvas.width = window.innerWidth;
@@ -119,70 +120,70 @@
         function initRain() {
             drops = [];
             const density = document.getElementById('rain-den').value;
-            // 联动调节背景模糊度（氤氲感）
-            document.documentElement.style.setProperty('--fog', (density/25) + 'px');
-            
+            document.documentElement.style.setProperty('--fog', (density/20) + 'px');
             for (let i = 0; i < density; i++) {
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    w: Math.random() * 2 + 1, // 宽度
-                    h: Math.random() * 5 + 8, // 长度（水滴状）
-                    v: Math.random() * 0.4 + 0.1, // 基础下滑速度
-                    opacity: Math.random() * 0.5 + 0.2
+                    s: Math.random() * 0.4 + 0.2, // 缩放比例
+                    v: Math.random() * 0.5 + 0.2, // 下滑速度
+                    a: Math.random() * 0.5 + 0.3  // 透明度
                 });
             }
         }
 
-        function drawTeardrop(x, y, w, h, a) {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.beginPath();
-            // 绘制真实物理水滴：上尖下圆
-            ctx.moveTo(0, 0);
-            ctx.bezierCurveTo(-w, h/2, -w, h, 0, h);
-            ctx.bezierCurveTo(w, h, w, h/2, 0, 0);
-            
-            // 径向渐变模拟折射和剔透感
-            let grad = ctx.createRadialGradient(-w/3, h/3, 1, 0, h/2, h);
-            grad.addColorStop(0, `rgba(255, 255, 255, ${a * 1.5})`); // 高光点
-            grad.addColorStop(0.4, `rgba(255, 255, 255, ${a * 0.3})`); // 透明主体
-            grad.addColorStop(1, `rgba(255, 255, 255, 0)`); // 消失边缘
-            
-            ctx.fillStyle = grad;
-            ctx.fill();
-            ctx.restore();
-        }
-
+        // 核心渲染：模拟物理折射
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             drops.forEach(d => {
-                drawTeardrop(d.x, d.y, d.w, d.h, d.opacity);
+                ctx.save();
+                ctx.globalAlpha = d.a;
+                // 使用 Alpha 通道渲染形状
+                ctx.drawImage(dropAlpha, d.x, d.y, dropAlpha.width * d.s, dropAlpha.height * d.s);
+                // 使用 Color 通道增加叠加折射感
+                ctx.globalCompositeOperation = 'overlay';
+                ctx.drawImage(dropColor, d.x, d.y, dropColor.width * d.s, dropColor.height * d.s);
+                ctx.restore();
 
-                // 物理下落逻辑：重力感滑行
                 d.y += d.v;
-                if (Math.random() > 0.99) d.v += 0.2; // 积聚后加速划落
-
                 if (d.y > canvas.height) {
-                    d.y = -d.h;
+                    d.y = -100;
                     d.x = Math.random() * canvas.width;
-                    d.v = Math.random() * 0.4 + 0.1;
                 }
             });
             requestAnimationFrame(draw);
         }
 
-        function sync() { audio.volume = document.getElementById('vol').value; }
-        function toggle(e) {
-            e.stopPropagation();
-            if(audio.paused) { audio.play(); pbtn.innerText = "STOP"; }
-            else { audio.pause(); pbtn.innerText = "PLAY"; }
+        // 倒计时拦截逻辑
+        function startIntercept(sec) {
+            const box = document.getElementById('timer-box');
+            box.style.display = 'block';
+            let timeLeft = sec;
+            
+            if(timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                const m = Math.floor(timeLeft / 60);
+                const s = timeLeft % 60;
+                box.innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                if(timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    box.innerText = "CALM ACHIEVED";
+                }
+                timeLeft--;
+            }, 1000);
         }
-        function autoPlay() { if(audio.paused) audio.play().then(()=>pbtn.innerText="STOP").catch(()=>{}); }
+
+        function sync() { audio.volume = document.getElementById('vol').value; }
+        function changeBG() { stage.style.backgroundImage = `url("${document.getElementById('bg-select').value}")`; }
+        function toggle(e) { 
+            e.stopPropagation(); 
+            audio.paused ? (audio.play(), pbtn.innerText="STOP") : (audio.pause(), pbtn.innerText="PLAY");
+        }
+        function autoPlay() { if(audio.paused) audio.play().then(()=>pbtn.innerText="STOP"); }
 
         window.addEventListener('resize', resize);
-        window.onload = () => { changeBG(); resize(); draw(); };
+        window.onload = () => { resize(); draw(); };
     </script>
 </body>
 </html>
