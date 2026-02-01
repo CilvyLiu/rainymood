@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova's Pensieve - Ultra Refraction</title>
+    <title>Nova's Pensieve - Ultra Full Version</title>
     <style>
         :root { --glass: rgba(0, 0, 0, 0.7); --border: rgba(255, 255, 255, 0.15); --gold: #d4af37; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: serif; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif; }
 
+        /* 背景层 */
         #main-stage {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-size: cover; background-position: center;
@@ -17,20 +18,25 @@
 
         #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
+        /* 侧边导航 - 全部链接保留 */
         .side-nav { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 10; }
         .nav-card { background: var(--glass); border: 1px solid var(--border); padding: 12px 8px; border-radius: 12px; text-decoration: none; color: #888; backdrop-filter: blur(10px); transition: 0.3s; width: 60px; text-align: center; font-size: 11px; }
         .nav-card:hover { color: #fff; border-color: var(--gold); transform: translateX(5px); }
 
+        /* 冷静中心 */
         .discipline-center { position: absolute; top: 45%; left: 55%; transform: translate(-50%, -50%); width: 85%; max-width: 450px; z-index: 10; }
-        details { background: rgba(10, 15, 25, 0.9); border: 1px solid var(--gold); padding: 25px; border-radius: 20px; backdrop-filter: blur(25px); box-shadow: 0 30px 60px rgba(0,0,0,0.8); }
+        details { background: rgba(10, 15, 25, 0.85); border: 1px solid var(--gold); padding: 25px; border-radius: 20px; backdrop-filter: blur(25px); box-shadow: 0 30px 60px rgba(0,0,0,0.8); }
         summary { font-size: 1.1rem; letter-spacing: 5px; cursor: pointer; color: var(--gold); list-style: none; text-align: center; outline: none; }
-        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 2rem; margin: 15px 0; display: none; text-shadow: 0 0 10px var(--gold); }
+        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 2.5rem; margin: 15px 0; display: none; text-shadow: 0 0 10px var(--gold); }
         .rules { margin-top: 20px; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; line-height: 1.6; }
 
-        .bottom-bar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--glass); padding: 10px 30px; border-radius: 50px; display: flex; gap: 20px; align-items: center; z-index: 10; border: 1px solid var(--border); }
-        .ctrl-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #999; }
-        input[type=range] { accent-color: var(--gold); width: 80px; }
-        .play-btn { background: none; border: 1px solid var(--gold); color: var(--gold); border-radius: 20px; padding: 5px 20px; cursor: pointer; font-size: 11px; }
+        /* 底部控制栏 */
+        .bottom-bar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--glass); padding: 12px 30px; border-radius: 50px; display: flex; gap: 25px; align-items: center; z-index: 10; border: 1px solid var(--border); backdrop-filter: blur(15px); }
+        .ctrl-item { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #aaa; }
+        input[type=range] { accent-color: var(--gold); width: 80px; cursor: pointer; }
+        .play-btn { background: none; border: 1px solid var(--gold); color: var(--gold); border-radius: 20px; padding: 6px 22px; cursor: pointer; font-size: 11px; letter-spacing: 1px; transition: 0.3s; }
+        .play-btn:hover { background: var(--gold); color: black; }
+        select { background: transparent; color: white; border: 1px solid var(--border); border-radius: 5px; padding: 2px 5px; }
     </style>
 </head>
 <body onclick="autoPlay()">
@@ -41,14 +47,18 @@
     <div class="side-nav">
         <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card">🏦<br>古灵</a>
         <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card">🐾<br>嗅嗅</a>
+        <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card">📜<br>日报</a>
+        <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card">🔮<br>看板</a>
     </div>
 
     <div class="discipline-center">
         <details open>
             <summary>✧ DISCIPLINE ✧</summary>
             <div id="timer-box">05:00</div>
-            <div class="rules">
+            <div class="rules" id="rule-content">
                 1. <b>情绪拦截</b>：产生焦虑时，启动冷静倒计时。<br>
+                2. <b>信号确认</b>：看板未现强力突破，绝不动手。<br>
+                3. <b>保护机制</b>：古灵阁冷却期间，严禁劫持系统。<br>
                 <button class="play-btn" style="width:100%; margin-top:15px;" onclick="startIntercept(300)">启动冷静拦截</button>
             </div>
         </details>
@@ -56,13 +66,13 @@
 
     <div class="bottom-bar">
         <div class="ctrl-item">🖼️ 
-            <select id="bg-select" onchange="changeBG()" style="background:#000; color:white; border:none;">
+            <select id="bg-select" onchange="changeBG()">
                 <option value="pensive.png">Pensive</option>
                 <option value="train.png">Express</option>
             </select>
         </div>
         <div class="ctrl-item">🔊 <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5" oninput="sync()"></div>
-        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="20" max="100" step="1" value="40" oninput="initRain()"></div>
+        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="20" max="120" step="1" value="45" oninput="initRain()"></div>
         <button id="pbtn" class="play-btn" onclick="toggle(event)">PLAY</button>
     </div>
 
@@ -75,18 +85,19 @@
         const stage = document.getElementById('main-stage');
         const bgImg = new Image();
 
-        // 加载你描述的素材
-        const imgShape = new Image(); imgShape.src = 'drop.png'; // 黑色圆点图
-        const imgColor = new Image(); imgColor.src = 'alpha.png'; // 彩色方块图
-
+        // 加载素材
+        const imgShape = new Image(); imgShape.src = 'drop.png';  // 黑色模糊圆点
+        const imgColor = new Image(); imgColor.src = 'alpha.png'; // 彩色高光方块
+        
         let drops = [];
         let timerInterval;
-        const spriteSize = 5; // 假设是 5x5 的布局
+        const spriteRows = 5; 
+        const spriteCols = 5;
 
         function changeBG() {
             const val = document.getElementById('bg-select').value;
             stage.style.backgroundImage = `url("${val}")`;
-            bgImg.src = val;
+            bgImg.src = val; 
         }
 
         function resize() {
@@ -98,18 +109,23 @@
         function initRain() {
             drops = [];
             const density = document.getElementById('rain-den').value;
-            const sw = imgShape.width / spriteSize;
-            const sh = imgShape.height / spriteSize;
+            // 动态调节背景模糊度
+            document.documentElement.style.setProperty('--fog', (density/15) + 'px');
+            
+            // 计算单颗雨滴切片尺寸
+            const sw = imgShape.width / spriteCols;
+            const sh = imgShape.height / spriteRows;
+
             for (let i = 0; i < density; i++) {
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    sx: Math.floor(Math.random() * spriteSize) * sw,
-                    sy: Math.floor(Math.random() * spriteSize) * sh,
+                    sx: Math.floor(Math.random() * spriteCols) * sw,
+                    sy: Math.floor(Math.random() * spriteRows) * sh,
                     sw: sw, sh: sh,
-                    s: Math.random() * 0.3 + 0.2,
-                    v: Math.random() * 1.5 + 0.8,
-                    a: Math.random() * 0.5 + 0.3
+                    s: Math.random() * 0.35 + 0.15, // 缩放
+                    v: Math.random() * 1.8 + 0.6,    // 速度
+                    a: Math.random() * 0.6 + 0.3     // 透明度
                 });
             }
         }
@@ -126,26 +142,29 @@
                 const dh = d.sh * d.s;
 
                 ctx.save();
-                
-                // 步骤 1: 绘制折射背景（在大图范围内偏移）
-                ctx.beginPath();
-                ctx.save();
                 ctx.translate(d.x, d.y);
-                // 模拟水滴内部的倒置或位移
+                
+                // 1. 绘制带有位移的背景（产生折射）
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(0, 0, dw, dh);
+                ctx.clip(); // 限制绘制区域，防止方块溢出
+                // 绘制背景并稍微偏移 + 放大一点点
                 ctx.drawImage(bgImg, d.x, d.y - 20, dw, dh, 0, 0, dw, dh);
                 ctx.restore();
 
-                // 步骤 2: 使用“黑色圆点”作为模具切掉多余背景 (让方块变圆)
+                // 2. 核心遮罩：用黑色圆点把背景剪裁成水滴形状
                 ctx.globalCompositeOperation = 'destination-in';
-                ctx.drawImage(imgShape, d.sx, d.sy, d.sw, d.sh, d.x, d.y, dw, dh);
+                ctx.drawImage(imgShape, d.sx, d.sy, d.sw, d.sh, 0, 0, dw, dh);
 
-                // 步骤 3: 叠加“彩色光谱”增加质感 (只在亮部显色)
+                // 3. 叠加彩色光谱图：利用 screen 模式只在高光处显示色彩
                 ctx.globalCompositeOperation = 'screen';
-                ctx.globalAlpha = 0.4;
-                ctx.drawImage(imgColor, d.sx, d.sy, d.sw, d.sh, d.x, d.y, dw, dh);
+                ctx.globalAlpha = 0.5;
+                ctx.drawImage(imgColor, d.sx, d.sy, d.sw, d.sh, 0, 0, dw, dh);
 
                 ctx.restore();
 
+                // 移动
                 d.y += d.v;
                 if (d.y > canvas.height) {
                     d.y = -dh;
@@ -164,13 +183,20 @@
                 const m = Math.floor(timeLeft / 60);
                 const s = timeLeft % 60;
                 box.innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-                if(timeLeft-- <= 0) { clearInterval(timerInterval); box.innerText = "ZEN"; }
+                if(timeLeft-- <= 0) {
+                    clearInterval(timerInterval);
+                    box.innerText = "ZEN";
+                }
             }, 1000);
         }
 
         function sync() { audio.volume = document.getElementById('vol').value; }
-        function toggle(e) { e.stopPropagation(); audio.paused ? audio.play() : audio.pause(); pbtn.innerText = audio.paused ? "PLAY" : "STOP"; }
-        function autoPlay() { if(audio.paused) audio.play().then(()=>pbtn.innerText="STOP").catch(()=>{}); }
+        function toggle(e) { 
+            e.stopPropagation(); 
+            if(audio.paused) { audio.play(); pbtn.innerText = "STOP"; } 
+            else { audio.pause(); pbtn.innerText = "PLAY"; } 
+        }
+        function autoPlay() { if(audio.paused) { audio.play().then(()=>pbtn.innerText="STOP").catch(()=>{}); } }
 
         window.onload = () => { changeBG(); imgShape.onload = () => { resize(); draw(); } };
         window.onresize = resize;
