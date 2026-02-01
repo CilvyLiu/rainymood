@@ -2,19 +2,19 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Nova's Pensieve - Physical Realism</title>
+    <title>Nova's Pensieve - Rainyscope Fusion</title>
     <style>
         :root { 
             --glass: rgba(255, 255, 255, 0.03); 
-            --blur: blur(25px); 
+            --blur: blur(20px); 
             --border: rgba(255, 255, 255, 0.08); 
         }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "PingFang SC", sans-serif; }
         
-        /* 背景保持模糊，雨滴内部保持清晰 */
-        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: 1.5s; filter: blur(10px) brightness(0.5); }
+        /* 提升背景清晰度，使其更真实 */
+        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: 1.5s; filter: blur(3px) brightness(0.6); }
         #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 20%, rgba(0,0,0,0.5) 100%); z-index: 2; pointer-events: none; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.4) 100%); z-index: 2; pointer-events: none; }
 
         .side-nav { position: fixed; left: 25px; top: 50%; transform: translateY(-50%); z-index: 100; display: flex; flex-direction: column; gap: 15px; }
         .nav-item { 
@@ -26,7 +26,7 @@
 
         .center-container { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; width: 500px; }
         .rule-card { 
-            background: rgba(10, 10, 10, 0.4); backdrop-filter: blur(40px); 
+            background: rgba(10, 10, 10, 0.5); backdrop-filter: blur(40px); 
             border: 1px solid var(--border); border-radius: 24px; padding: 40px;
             display: none; transition: 0.5s ease-in-out; margin-bottom: 25px;
             box-shadow: 0 30px 60px rgba(0,0,0,0.8);
@@ -81,7 +81,7 @@
     <div class="bottom-bar">
         <div id="clock" style="font-size: 13px; letter-spacing: 2px; font-weight: 200; min-width: 80px;"></div>
         <label>VOLUME</label> <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()">
-        <label>STORM</label> <input type="range" id="den" min="20" max="300" value="100" oninput="initRain()">
+        <label>STORM</label> <input type="range" id="den" min="20" max="400" value="120" oninput="initRain()">
         <select onchange="handleSceneChange(this)">
             <option value="pensive.png|contain">🏺 冥想盆</option>
             <option value="train.png|cover">🚂 霍格沃茨</option>
@@ -135,13 +135,11 @@
                     y: Math.random() * canvas.height,
                     si: Math.floor(Math.random() * sprite),
                     sj: Math.floor(Math.random() * sprite),
-                    // 尺寸进一步放大，大滴 0.3-0.6
-                    s: isHeavy ? (Math.random() * 0.3 + 0.3) : (Math.random() * 0.1 + 0.05),
+                    s: isHeavy ? (Math.random() * 0.35 + 0.25) : (Math.random() * 0.12 + 0.05),
                     v: 0,
                     isHeavy: isHeavy,
-                    tension: Math.random() * 0.2 + 0.8, // 表面张力系数
-                    lastY: 0,
-                    trail: []
+                    tension: Math.random() * 0.15 + 0.85, 
+                    trail: [] // 拖拽痕迹
                 });
             }
         }
@@ -150,12 +148,26 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (!imgMask.complete || !imgAlpha.complete) { requestAnimationFrame(draw); return; }
 
-            // 深度排序：确保大滴覆盖小滴
             drops.sort((a,b) => a.s - b.s).forEach(d => {
                 const sw = imgMask.width / sprite;
                 const sh = imgMask.height / sprite;
                 const dw = sw * d.s;
-                const dh = dw * (d.isHeavy ? 1.5 : 1.2);
+                const dh = dw * (d.isHeavy ? 1.6 : 1.3);
+
+                // 绘制水痕（Rainyscope 灵魂）
+                if (d.isHeavy && d.trail.length > 0) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.15;
+                    ctx.beginPath();
+                    d.trail.forEach((t, i) => {
+                        ctx.lineTo(t.x, t.y);
+                    });
+                    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+                    ctx.lineWidth = dw * 0.5;
+                    ctx.lineCap = "round";
+                    ctx.stroke();
+                    ctx.restore();
+                }
 
                 ctx.save();
                 ctx.translate(d.x, d.y);
@@ -167,41 +179,40 @@
                 ctx.bezierCurveTo(0, dh, 0, dh*0.3, dw/2, 0);
                 ctx.clip(); 
 
-                // 核心：折射模拟
+                // 透明感采样：背景反向及放大
                 if (bgImg.complete) {
-                    // 凸透镜原理：内部画面反转并放大
-                    ctx.scale(1, -1); 
-                    ctx.drawImage(bgImg, d.x, d.y, dw*0.4, dh*0.4, -dw/2, -dh/2, dw, dh);
-                    ctx.scale(1, -1);
+                    ctx.scale(1.1, -1.1); // 模拟折射率
+                    ctx.drawImage(bgImg, d.x, d.y, dw*1.5, dh*1.5, -dw/2, -dh/2, dw*2, dh*2);
+                    ctx.scale(1/1.1, -1/1.1);
                 }
 
-                // 质感叠加
-                ctx.globalAlpha = d.isHeavy ? 0.9 : 0.5;
+                ctx.globalAlpha = d.isHeavy ? 0.95 : 0.6;
                 ctx.globalCompositeOperation = 'screen';
                 ctx.drawImage(imgAlpha, d.si*sw, d.sj*sh, sw, sh, 0, 0, dw, dh);
                 ctx.globalCompositeOperation = 'multiply';
                 ctx.drawImage(imgMask, d.si*sw, d.sj*sh, sw, sh, 0, 0, dw, dh);
                 ctx.restore();
 
-                // 非线性物理引擎
+                // 物理引擎：模拟表面张力突破
                 if (d.isHeavy) {
-                    // 模拟表面张力：只有重力积累到一定程度才会向下滑动
-                    if (Math.random() > 0.96) d.v += 0.8; 
+                    if (Math.random() > 0.97) d.v += 0.95; // 积蓄重力突破张力
                     d.v *= d.tension; 
                     d.y += d.v;
-                    d.x += Math.sin(d.y/50) * 0.3; // 蛇形下滑
+                    d.x += Math.sin(d.y/30) * 0.2; 
 
-                    // 遇到“阻力”瞬间减速
-                    if (Math.random() > 0.99) {
-                        d.v *= 0.05;
+                    // 记录痕迹
+                    if (d.v > 0.5) {
+                        d.trail.push({x: d.x + dw/2, y: d.y});
+                        if (d.trail.length > 15) d.trail.shift();
                     }
+                    
+                    if (Math.random() > 0.985) d.v *= 0.1; // 重新被张力捕获
                 } else {
-                    // 小水滴缓慢蠕动
-                    d.y += 0.1;
+                    d.y += 0.15; // 静止雨点极其微小的蠕动
                 }
 
                 if (d.y > canvas.height) {
-                    d.y = -dh; d.x = Math.random()*canvas.width; d.v = 0;
+                    d.y = -dh; d.x = Math.random()*canvas.width; d.v = 0; d.trail = [];
                 }
             });
             requestAnimationFrame(draw);
