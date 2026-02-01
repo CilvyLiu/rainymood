@@ -1,0 +1,146 @@
+import streamlit as st
+import base64
+from pathlib import Path
+from datetime import datetime, timedelta, timezone
+
+# ===================== 1. 基础配置 =====================
+st.set_page_config(page_title="Nova's Pensieve", layout="wide", initial_sidebar_state="collapsed")
+
+TZ_CHINA = timezone(timedelta(hours=8))
+now_china = datetime.now(timezone.utc).astimezone(TZ_CHINA)
+
+def get_base64(file_path):
+    try:
+        if Path(file_path).exists():
+            with open(file_path, "rb") as f:
+                return base64.b64encode(f.read()).decode()
+        return ""
+    except: return ""
+
+# ===================== 2. 核心架构注入 =====================
+def inject_pensieve_system(bg_file, audio_file):
+    bg_base64 = get_base64(bg_file)
+    audio_base64 = get_base64(audio_file)
+    is_pensieve = "pensieve" in bg_file
+    
+    # 动态背景样式
+    bg_style = f"""
+        background: url("data:image/gif;base64,{bg_base64}");
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: {"400px" if is_pensieve else "cover"};
+        background-color: black;
+    """
+
+    st.markdown(f"""
+    <style>
+    .stApp {{
+        {bg_style}
+        transition: all 1.5s ease-in-out;
+    }}
+
+    /* 雨滴玻璃滤镜 - 全屏叠加 */
+    .stApp::after {{
+        content: "";
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-image: url("https://www.transparenttextures.com/patterns/glass-pass.png");
+        opacity: 0.25;
+        pointer-events: none;
+        z-index: 1;
+    }}
+
+    /* 调色蒙版 */
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: {"rgba(0,0,0,0.8)" if is_pensieve else "rgba(10, 20, 30, 0.4)"};
+        backdrop-filter: brightness(0.7);
+        z-index: -1;
+    }}
+
+    /* 导航卡片 */
+    .nav-card {{
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        transition: 0.4s;
+        text-decoration: none !important;
+        color: white !important;
+        backdrop-filter: blur(10px);
+        display: block;
+    }}
+    .nav-card:hover {{
+        background: rgba(0, 212, 255, 0.1);
+        border: 1px solid #00d4ff;
+        transform: translateY(-5px);
+    }}
+
+    header, footer {{visibility: hidden;}}
+    </style>
+    
+    <audio autoplay loop id="rainAudio">
+        <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+    </audio>
+    
+    <script>
+        var audio = document.getElementById("rainAudio");
+        audio.volume = 0.5;
+        // 核心交互：点击屏幕任何地方播放雨声
+        document.addEventListener('click', function() {{
+            audio.play();
+        }});
+    </script>
+    """, unsafe_allow_html=True)
+
+# ===================== 3. 场景逻辑 =====================
+SCENE_FILES = {
+    "🏺 冥想盆": "pensieve.png",
+    "🚂 火车": "train.pngf",
+    "🪟 落地窗": "window.png",
+    "🏖️ 沙滩": "beach.png",
+    "⛰️ 山顶": "mountain.png"
+}
+
+if "current_scene_file" not in st.session_state:
+    st.session_state.current_scene_file = SCENE_FILES["🏺 冥想盆"]
+
+inject_pensieve_system(st.session_state.current_scene_file, "0.m4a")
+
+# ===================== 4. UI 布局 =====================
+# 顶部标题
+st.markdown(f"<h2 style='text-align: center; color: white; font-family: serif; letter-spacing: 10px; opacity: 0.7;'>THE PENSIEVE</h2>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align: center; color: #555; font-size: 12px;'>{now_china.strftime('%H:%M:%S')} CST</p>", unsafe_allow_html=True)
+
+# 留出中间背景区域（冥想盆位置）
+st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
+
+# 功能卡片
+cols = st.columns(4)
+links = [
+    ("🏦", "古灵阁", "https://gringott.streamlit.app/"),
+    ("🐾", "嗅嗅探测", "https://wwskygazer.streamlit.app/"),
+    ("📜", "预言日报", "https://newscil.streamlit.app/"),
+    ("🔮", "战略看板", "https://skygazer111.streamlit.app/")
+]
+
+for i, (emoji, name, url) in enumerate(links):
+    with cols[i]:
+        st.markdown(f"""
+        <a href="{url}" target="_blank" class="nav-card">
+            <h2 style="margin:0;">{emoji}</h2>
+            <div style="font-size: 14px; margin-top:5px; letter-spacing:2px;">{name}</div>
+        </a>
+        """, unsafe_allow_html=True)
+
+# 底部环境切换
+st.markdown("<br><br>", unsafe_allow_html=True)
+with st.expander("✨ 调谐冥想环境"):
+    sc_btns = st.columns(len(SCENE_FILES))
+    for i, (name, file) in enumerate(SCENE_FILES.items()):
+        if sc_btns[i].button(name):
+            st.session_state.current_scene_file = file
+            st.rerun()
