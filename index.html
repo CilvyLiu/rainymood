@@ -7,7 +7,6 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: black; color: white; overflow: hidden; font-family: serif; }
         
-        /* 核心背景层 */
         #bg-layer {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             transition: all 1.5s ease-in-out;
@@ -16,24 +15,21 @@
             z-index: -3;
         }
 
-        /* 调色蒙版 */
         #mask {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             transition: all 1.5s ease-in-out;
             z-index: -2;
         }
 
-        /* 玻璃雨滴滤镜 - 增强了对比度以便调节明显 */
+        /* 使用你上传的 stardust.png 作为雨点滤镜 */
         #rain-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-image: url("https://www.transparenttextures.com/patterns/glass-pass.png");
-            background-color: rgba(255, 255, 255, 0.05);
-            opacity: 0.25;
+            background-image: url("stardust.png");
+            opacity: 0.3;
             pointer-events: none;
             z-index: -1;
         }
 
-        /* UI 容器 */
         .container {
             display: flex; flex-direction: column; align-items: center;
             justify-content: space-between; height: 100vh; padding: 40px 0;
@@ -43,7 +39,6 @@
         .header h2 { letter-spacing: 10px; opacity: 0.7; margin: 0; }
         .header p { color: #555; font-size: 12px; margin-top: 5px; }
 
-        /* 功能卡片 */
         .nav-grid {
             display: grid; grid-template-columns: repeat(4, 1fr);
             gap: 20px; width: 90%; max-width: 900px;
@@ -57,7 +52,6 @@
         }
         .nav-card:hover { border-color: #00d4ff; transform: translateY(-5px); background: rgba(0, 212, 255, 0.1); }
 
-        /* 控制面板 */
         .audio-controls {
             background: rgba(0, 0, 0, 0.7);
             padding: 15px 25px; border-radius: 40px;
@@ -102,17 +96,17 @@
                 </div>
                 <div class="slider-group">
                     <span>🌧️雨点</span>
-                    <input type="range" id="rainSlider" min="0" max="0.9" step="0.01" value="0.25" oninput="updateRain()">
+                    <input type="range" id="rainSlider" min="0" max="1" step="0.01" value="0.3" oninput="updateRain()">
                 </div>
-                <button onclick="toggleAudio()" id="playBtn">🔇 点击开启</button>
+                <button onclick="toggleAudio()" id="playBtn">🔇 停止播放</button>
             </div>
 
             <div class="scene-switcher">
-                <button onclick="setScene('pensive.png', '400px', 0.85)">🏺 冥想盆</button>
-                <button onclick="setScene('train.png', 'cover', 0.45)">🚂 火车</button>
-                <button onclick="setScene('window.png', 'cover', 0.45)">🪟 落地窗</button>
-                <button onclick="setScene('beach.png', 'cover', 0.45)">🏖️ 沙滩</button>
-                <button onclick="setScene('mountain.png', 'cover', 0.45)">⛰️ 山顶</button>
+                <button onclick="setScene('pensive.png', '450px', 0.85)">🏺 冥想盆</button>
+                <button onclick="setScene('train.png', 'cover', 0.5)">🚂 火车</button>
+                <button onclick="setScene('window.png', 'cover', 0.5)">🪟 落地窗</button>
+                <button onclick="setScene('beach.png', 'cover', 0.5)">🏖️ 沙滩</button>
+                <button onclick="setScene('mountain.png', 'cover', 0.5)">⛰️ 山顶</button>
             </div>
         </div>
     </div>
@@ -136,17 +130,18 @@
 
         function initAudio() {
             if (audio.paused) {
-                audio.play();
-                playBtn.innerText = "🔊 播放中";
+                audio.play().catch(e => {});
+                playBtn.innerText = "🔊 正在播放";
             }
         }
 
         function updateAudio() { audio.volume = volSlider.value; }
 
-        function toggleAudio() {
+        function toggleAudio(event) {
+            if(event) event.stopPropagation(); // 防止冒泡触发 body 的 initAudio
             if (audio.paused) {
                 audio.play();
-                playBtn.innerText = "🔊 播放中";
+                playBtn.innerText = "🔊 正在播放";
             } else {
                 audio.pause();
                 playBtn.innerText = "🔇 已停止";
@@ -154,7 +149,6 @@
         }
 
         function updateRain() {
-            // 通过调节透明度改变“雨点”感
             rainOverlay.style.opacity = rainSlider.value;
         }
 
@@ -163,8 +157,8 @@
             document.getElementById('clock').innerText = now.toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai', hour12: false}) + " CST";
         }
 
-        // 默认初始化：使用你上传的文件名 pensive.png
-        setScene('pensive.png', '400px', 0.85);
+        // 初始化加载你上传的 pensive.png
+        setScene('pensive.png', '450px', 0.85);
         setInterval(updateClock, 1000);
         updateClock();
     </script>
