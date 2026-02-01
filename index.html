@@ -96,18 +96,20 @@
         }
 
         function changeWeather() {
-        const weather = document.getElementById('weatherSelect').value;
-        if(window.rainEngine) {
-            const config = {
-                rain: { chance: 0.5 },
-                storm: { chance: 0.9 },
-                drizzle: { chance: 0.2 },
-                sunny: { chance: 0 }
-            };
-            // 修正属性访问：rainEngine.options 而不是 raindrops.options
-            window.rainEngine.options.rainChance = config[weather].chance;
-        }
+    const weather = document.getElementById('weatherSelect').value;
+    if(window.rainEngine) {
+        const config = {
+            rain: { chance: 0.4, speed: 4 },
+            storm: { chance: 0.8, speed: 8 },
+            drizzle: { chance: 0.15, speed: 2 },
+            sunny: { chance: 0, speed: 0 }
+        };
+        const opt = config[weather];
+        // 直接修改 renderer 的 options
+        window.rainEngine.options.rainChance = opt.chance;
+        window.rainEngine.options.baseSpeed = opt.speed; 
     }
+}
 
         function toggleRules(e) {
             e.stopPropagation();
