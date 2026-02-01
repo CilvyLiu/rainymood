@@ -23,10 +23,11 @@
             z-index: -2;
         }
 
-        /* 雨滴玻璃滤镜 */
+        /* 玻璃雨滴滤镜 - 增强了对比度以便调节明显 */
         #rain-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-image: url("https://www.transparenttextures.com/patterns/glass-pass.png");
+            background-color: rgba(255, 255, 255, 0.05);
             opacity: 0.25;
             pointer-events: none;
             z-index: -1;
@@ -56,17 +57,16 @@
         }
         .nav-card:hover { border-color: #00d4ff; transform: translateY(-5px); background: rgba(0, 212, 255, 0.1); }
 
-        /* Rainymood 调节器样式 */
+        /* 控制面板 */
         .audio-controls {
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.7);
             padding: 15px 25px; border-radius: 40px;
             display: flex; align-items: center; gap: 20px;
-            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
         }
         .slider-group { display: flex; align-items: center; gap: 10px; }
         input[type=range] { cursor: pointer; accent-color: #00d4ff; }
 
-        /* 底部场景切换 */
         .scene-switcher { display: flex; gap: 10px; margin-top: 20px; }
         button {
             background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
@@ -102,17 +102,17 @@
                 </div>
                 <div class="slider-group">
                     <span>🌧️雨点</span>
-                    <input type="range" id="rainSlider" min="0" max="0.8" step="0.01" value="0.25" oninput="updateRain()">
+                    <input type="range" id="rainSlider" min="0" max="0.9" step="0.01" value="0.25" oninput="updateRain()">
                 </div>
-                <button onclick="toggleAudio()" id="playBtn">🔇 停止</button>
+                <button onclick="toggleAudio()" id="playBtn">🔇 点击开启</button>
             </div>
 
             <div class="scene-switcher">
-                <button onclick="setScene('pensieve.png', '400px', 0.8)">🏺 冥想盆</button>
-                <button onclick="setScene('train.png', 'cover', 0.4)">🚂 火车</button>
-                <button onclick="setScene('window.png', 'cover', 0.4)">🪟 落地窗</button>
-                <button onclick="setScene('beach.png', 'cover', 0.4)">🏖️ 沙滩</button>
-                <button onclick="setScene('mountain.png', 'cover', 0.4)">⛰️ 山顶</button>
+                <button onclick="setScene('pensive.png', '400px', 0.85)">🏺 冥想盆</button>
+                <button onclick="setScene('train.png', 'cover', 0.45)">🚂 火车</button>
+                <button onclick="setScene('window.png', 'cover', 0.45)">🪟 落地窗</button>
+                <button onclick="setScene('beach.png', 'cover', 0.45)">🏖️ 沙滩</button>
+                <button onclick="setScene('mountain.png', 'cover', 0.45)">⛰️ 山顶</button>
             </div>
         </div>
     </div>
@@ -128,24 +128,20 @@
         const rainSlider = document.getElementById('rainSlider');
         const playBtn = document.getElementById('playBtn');
 
-        // 初始化场景
         function setScene(img, size, brightness) {
             bgLayer.style.backgroundImage = `url('${img}')`;
             bgLayer.style.backgroundSize = size;
             mask.style.backgroundColor = `rgba(0, 0, 0, ${brightness})`;
         }
 
-        // 音频控制
         function initAudio() {
             if (audio.paused) {
-                audio.play().catch(e => console.log("等待交互播放"));
+                audio.play();
                 playBtn.innerText = "🔊 播放中";
             }
         }
 
-        function updateAudio() {
-            audio.volume = volSlider.value;
-        }
+        function updateAudio() { audio.volume = volSlider.value; }
 
         function toggleAudio() {
             if (audio.paused) {
@@ -157,19 +153,18 @@
             }
         }
 
-        // 雨点强度控制 (调节滤镜透明度)
         function updateRain() {
+            // 通过调节透明度改变“雨点”感
             rainOverlay.style.opacity = rainSlider.value;
         }
 
-        // 时钟
         function updateClock() {
             const now = new Date();
             document.getElementById('clock').innerText = now.toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai', hour12: false}) + " CST";
         }
 
-        // 默认启动
-        setScene('pensieve.png', '400px', 0.8);
+        // 默认初始化：使用你上传的文件名 pensive.png
+        setScene('pensive.png', '400px', 0.85);
         setInterval(updateClock, 1000);
         updateClock();
     </script>
