@@ -82,12 +82,15 @@
 
         // 切换背景场景
         function changeScene() {
-            const sceneUrl = document.getElementById('sceneSelect').value;
-            if(window.changeScene) {
-                // 调用 rain.js 暴露的全局函数
-                window.changeScene(sceneUrl);
-            }
-        }
+    const sceneUrl = document.getElementById('sceneSelect').value;
+    if(window.rainEngine) {
+        const img = new Image();
+        img.onload = function() {
+            window.rainEngine.updateBackground(img);
+        };
+        img.src = sceneUrl;
+    }
+}
 
         // 切换天气参数
         function changeWeather() {
