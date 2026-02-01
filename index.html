@@ -82,80 +82,60 @@
 
     <audio id="audio" loop src="0.m4a"></audio>
 
-    <script src="rain.js"></script>
-    <script>
-        const audio = document.getElementById('audio');
-        const pbtn = document.getElementById('pbtn');
+   <script src="rain.js"></script>
+<script>
+    const audio = document.getElementById('audio');
+    const pbtn = document.getElementById('pbtn');
 
-        // 1. 首先：显式挂载全局函数，防止闭包导致 undefined
-        window.initAudio = function() { 
-            if(audio.paused) { 
-                audio.play().catch(e => console.log("等待交互...")); 
-                pbtn.innerText = "⏸"; 
-            } 
-        };
+    // 只需要保留 UI 交互逻辑，核心渲染逻辑交给 rain.js
+    window.initAudio = function() { 
+        if(audio.paused) { 
+            audio.play().catch(e => console.log("等待交互...")); 
+            pbtn.innerText = "⏸"; 
+        } 
+    };
 
-        window.toggleAudio = function(e) { 
-            e.stopPropagation(); 
-            if (audio.paused) {
-                audio.play();
-                pbtn.innerText = "⏸";
-            } else {
-                audio.pause();
-                pbtn.innerText = "▶";
-            }
-        };
+    // 音频同步滑动条
+    function sync() { 
+        audio.volume = document.getElementById('vol').value; 
+    }
 
-        window.changeScene = function(sceneUrl) {
-            if(window.rainEngine && sceneUrl) {
-                // 预加载新图片，加载完再切换，防止黑屏
-                const img = new Image();
-                img.onload = () => window.rainEngine.updateBackground(img);
-                img.src = sceneUrl;
-            }
-        };
-
-        // 2. 接下来：天气与 UI 交互逻辑
-        function changeWeather() {
-            const weather = document.getElementById('weatherSelect').value;
-            if(window.rainEngine && window.rainEngine.raindrops) {
-                const config = {
-                    rain:    { chance: 0.3, minR: 15, maxR: 40 },
-                    storm:   { chance: 0.7, minR: 20, maxR: 50 },
-                    drizzle: { chance: 0.1, minR: 5,  maxR: 20 },
-                    sunny:   { chance: 0,   minR: 0,  maxR: 0 }
-                };
-                const opt = config[weather];
-                const target = window.rainEngine.raindrops.options;
-                
-                target.rainChance = opt.chance;
-                target.minR = opt.minR;
-                target.maxR = opt.maxR;
-                
-                if(weather === 'sunny') window.rainEngine.raindrops.drops = [];
-            }
+    // 天气切换逻辑（可以保留在这里，因为它直接操作 rainEngine 的数值）
+    function changeWeather() {
+        const weather = document.getElementById('weatherSelect').value;
+        if(window.rainEngine && window.rainEngine.raindrops) {
+            const config = {
+                rain:    { chance: 0.3, minR: 15, maxR: 40 },
+                storm:   { chance: 0.7, minR: 20, maxR: 50 },
+                drizzle: { chance: 0.1, minR: 5,  maxR: 20 },
+                sunny:   { chance: 0,   minR: 0,  maxR: 0 }
+            };
+            const opt = config[weather];
+            const target = window.rainEngine.raindrops.options;
+            target.rainChance = opt.chance;
+            target.minR = opt.minR;
+            target.maxR = opt.maxR;
+            if(weather === 'sunny') window.rainEngine.raindrops.drops = [];
         }
+    }
 
-        function toggleRules(e) {
-            e.stopPropagation();
-            const card = document.getElementById('mainRule');
-            const isHidden = getComputedStyle(card).display === 'none';
-            card.style.display = isHidden ? 'block' : 'none';
-            e.target.innerText = isHidden ? 'RELEASE' : 'FOCUS MODE';
-        }
+    // 看板显隐
+    function toggleRules(e) {
+        e.stopPropagation();
+        const card = document.getElementById('mainRule');
+        const isHidden = getComputedStyle(card).display === 'none';
+        card.style.display = isHidden ? 'block' : 'none';
+        e.target.innerText = isHidden ? 'RELEASE' : 'FOCUS MODE';
+    }
 
-        function sync() { 
-            audio.volume = document.getElementById('vol').value; 
-        }
-
-        // 3. 最后：系统时钟
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour12: false});
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-        sync();
-    </script>
+    // 时钟
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour12: false});
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+    sync();
+</script>
 </body>
 </html>
