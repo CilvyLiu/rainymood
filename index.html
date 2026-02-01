@@ -8,17 +8,25 @@
         :root { --glass: rgba(0, 0, 0, 0.7); --border: rgba(255, 255, 255, 0.15); --gold: #d4af37; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: serif; }
 
-        /* 背景层：淡入淡出效果 */
+        /* 背景：带有动态毛玻璃效果 */
         #main-stage {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-size: cover; background-position: center;
             z-index: 1; transition: background-image 0.8s ease-in-out;
+            /* 模拟窗户水汽的初始模糊 */
+            filter: blur(2px) brightness(0.9);
         }
 
-        /* Canvas 雨滴 */
-        #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+        /* 覆盖层：增加一点水汽的脏感/质感 */
+        #mist {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 2; background: rgba(0,0,0,0.1);
+            backdrop-filter: blur(var(--blur-val, 2px));
+            pointer-events: none;
+        }
 
-        /* 侧边功能栏 */
+        #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+
         .side-nav {
             position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
             display: flex; flex-direction: column; gap: 15px; z-index: 10;
@@ -30,7 +38,6 @@
         }
         .nav-card:hover { color: #fff; border-color: var(--gold); transform: translateX(5px); }
 
-        /* 中央纪律卡片 */
         .discipline-center {
             position: absolute; top: 45%; left: 55%; transform: translate(-50%, -50%);
             width: 85%; max-width: 450px; z-index: 10;
@@ -43,7 +50,6 @@
         summary { font-size: 1rem; letter-spacing: 5px; cursor: pointer; color: var(--gold); list-style: none; text-align: center; outline: none; }
         .rules { margin-top: 20px; text-align: left; line-height: 1.8; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; }
 
-        /* 底部控制台 */
         .bottom-bar {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
             background: var(--glass); padding: 10px 30px; border-radius: 50px;
@@ -58,6 +64,7 @@
 <body onclick="autoPlay()">
 
     <div id="main-stage"></div>
+    <div id="mist"></div>
     <canvas id="rainCanvas"></canvas>
 
     <div class="side-nav">
@@ -71,7 +78,7 @@
         <details open>
             <summary>✧ DISCIPLINE ✧</summary>
             <div class="rules">
-                1. <b>情绪拦截</b>：焦虑时，强制观察雨水 5 分钟。<br>
+                1. <b>情绪拦截</b>：焦虑时，强制观察雨滴 5 分钟。<br>
                 2. <b>信号确认</b>：看板无强力信号，绝不动手。<br>
                 3. <b>保护机制</b>：古灵阁冷却期间，严禁强制交易。<br>
                 4. <b>穿透审计</b>：不听杂音，只看资金血统。<br>
@@ -91,7 +98,7 @@
             </select>
         </div>
         <div class="ctrl-item">🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></div>
-        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="20" max="400" step="10" value="120" oninput="initRain()"></div>
+        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="10" max="200" step="5" value="60" oninput="initRain()"></div>
         <button id="pbtn" class="play-btn" onclick="toggle(event)">PLAY</button>
     </div>
 
@@ -102,7 +109,7 @@
         const ctx = canvas.getContext('2d');
         const audio = document.getElementById('audio');
         const stage = document.getElementById('main-stage');
-        let raindrops = [];
+        let drops = [];
 
         function changeBG() {
             const file = document.getElementById('bg-select').value;
@@ -116,31 +123,61 @@
         }
 
         function initRain() {
-            raindrops = [];
+            drops = [];
             const density = document.getElementById('rain-den').value;
+            // 调整雾气程度
+            document.documentElement.style.setProperty('--blur-val', (density/40) + 'px');
+            
             for (let i = 0; i < density; i++) {
-                raindrops.push({
+                drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    l: Math.random() * 25 + 10,
-                    v: Math.random() * 4 + 2
+                    r: Math.random() * 3 + 1, // 水珠半径
+                    v: Math.random() * 0.5,   // 下落速度（很慢）
+                    a: Math.random() * 0.5 + 0.3, // 透明度
+                    lastUpdate: Date.now()
                 });
             }
         }
 
+        function drawDrop(x, y, r, a) {
+            // 绘制大颗水珠的折射效果
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            
+            // 水珠主体：透明感
+            ctx.fillStyle = `rgba(255, 255, 255, ${a * 0.3})`;
+            ctx.fill();
+
+            // 水珠高光：让它看起来圆润
+            ctx.beginPath();
+            ctx.arc(x - r/3, y - r/3, r/4, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${a})`;
+            ctx.fill();
+
+            // 边缘描边：增加折射感
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${a * 0.2})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+        }
+
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-            ctx.lineWidth = 1;
-            ctx.lineCap = 'round';
+            
+            drops.forEach(d => {
+                drawDrop(d.x, d.y, d.r, d.a);
 
-            raindrops.forEach(r => {
-                ctx.beginPath();
-                ctx.moveTo(r.x, r.y);
-                ctx.lineTo(r.x, r.y + r.l);
-                ctx.stroke();
-                r.y += r.v;
-                if (r.y > canvas.height) { r.y = -r.l; r.x = Math.random() * canvas.width; }
+                // 随机下落逻辑：模拟水珠积聚后滑落
+                d.y += d.v;
+                if (Math.random() > 0.98) d.v += 0.1; // 模拟加速划掉
+
+                if (d.y > canvas.height) {
+                    d.y = -d.r;
+                    d.x = Math.random() * canvas.width;
+                    d.v = Math.random() * 0.5;
+                }
             });
             requestAnimationFrame(draw);
         }
