@@ -2,96 +2,77 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Nova's Pensieve</title>
+    <title>Nova's Pensieve - Ultra Rain</title>
     <style>
-        /* 核心沉浸式容器 */
+        :root { --glass: rgba(0, 0, 0, 0.6); --border: rgba(255, 255, 255, 0.2); }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "PingFang SC", serif; }
+
+        /* 背景层 */
         #viewport {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: #000;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-size: cover;
-            transition: background-image 1.2s ease-in-out;
-            display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+            background-position: center; background-repeat: no-repeat; background-size: cover;
+            transition: background-image 1.2s ease-in-out; z-index: 1;
         }
 
-        /* 动态雨雾层：叠加在背景图之上 */
-        #rain-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background-image: url("stardust.png");
-            background-repeat: repeat;
-            background-size: 200px;
-            opacity: 0.4;
-            pointer-events: none;
-            mix-blend-mode: screen; /* 让雨点更亮 */
-        }
+        /* 动态玻璃雨滴层 */
+        #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
-        /* 蒙版：控制整体阴郁氛围 */
-        #overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            pointer-events: none;
-        }
+        /* 氛围遮罩 */
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.3); z-index: 2; pointer-events: none; }
 
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; color: white; font-family: "PingFang SC", "Hiragino Sans GB", serif; }
+        .content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 40px 0; box-sizing: border-box; }
 
-        .content { z-index: 10; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 40px 0; box-sizing: border-box; }
-
-        /* 导航卡片：Rainymood 风格的半透明感 */
+        /* 导航卡片 */
         .nav-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; width: 90%; max-width: 800px; }
         .nav-card {
-            background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 15px; padding: 15px; text-align: center; text-decoration: none; color: white;
-            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-            transition: 0.3s;
+            background: var(--glass); border: 1px solid var(--border); border-radius: 15px; padding: 15px; text-align: center; text-decoration: none; color: white;
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: 0.3s;
         }
-        .nav-card:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.5); }
+        .nav-card:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-5px); }
 
-        .bottom-panel { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; }
+        /* 控制台 */
         .controls {
-            background: rgba(0, 0, 0, 0.6); padding: 15px 30px; border-radius: 50px;
-            display: flex; align-items: center; gap: 20px; border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.7); padding: 15px 30px; border-radius: 50px;
+            display: flex; align-items: center; gap: 20px; border: 1px solid var(--border);
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        
-        button { background: transparent; border: 1px solid rgba(255,255,255,0.5); color: white; padding: 8px 18px; border-radius: 20px; cursor: pointer; transition: 0.2s; }
+        button { background: transparent; border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 18px; border-radius: 20px; cursor: pointer; transition: 0.2s; font-size: 12px; }
         button:hover { background: white; color: black; }
-        input[type=range] { accent-color: #fff; cursor: pointer; }
+        input[type=range] { accent-color: #fff; width: 80px; }
     </style>
 </head>
 <body onclick="initAudio()">
 
-    <div id="viewport">
-        <div id="overlay"></div>
-        <div id="rain-layer"></div>
+    <div id="viewport"></div>
+    <div id="overlay"></div>
+    <canvas id="rainCanvas"></canvas>
 
-        <div class="content">
-            <div style="text-align: center;">
-                <h1 style="letter-spacing: 15px; font-weight: 200; margin-bottom: 5px;">THE PENSIEVE</h1>
-                <div id="clock" style="font-size: 13px; opacity: 0.6; letter-spacing: 2px;"></div>
+    <div class="content">
+        <div style="text-align: center;">
+            <h1 style="letter-spacing: 15px; font-weight: 200; margin: 0;">THE PENSIEVE</h1>
+            <div id="clock" style="font-size: 13px; opacity: 0.6; letter-spacing: 2px; margin-top: 10px;"></div>
+        </div>
+
+        <div class="nav-grid">
+            <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card">🏦<br>古灵阁</a>
+            <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card">🐾<br>嗅嗅探测</a>
+            <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card">📜<br>预言日报</a>
+            <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card">🔮<br>战略看板</a>
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 20px;">
+            <div class="controls">
+                <span>🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
+                <span>🌧️ <input type="range" id="den" min="10" max="100" value="40" oninput="initRain()"></span>
+                <button id="pbtn" onclick="toggleAudio(event)">PLAY</button>
             </div>
-
-            <div class="nav-grid">
-                <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card">🏦<br>古灵阁</a>
-                <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card">🐾<br>嗅嗅探测</a>
-                <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card">📜<br>预言日报</a>
-                <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card">🔮<br>战略看板</a>
-            </div>
-
-            <div class="bottom-panel">
-                <div class="controls">
-                    <span>🔊 <input type="range" id="v" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
-                    <span>🌧️ <input type="range" id="r" min="0" max="1" step="0.1" value="0.4" oninput="sync()"></span>
-                    <button id="pbtn" onclick="toggleAudio(event)">PLAY</button>
-                </div>
-                
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="setScene('pensive.png', '500px')">🏺 冥想盆</button>
-                    <button onclick="setScene('train.png', 'cover')">🚂 火车</button>
-                    <button onclick="setScene('window.png', 'cover')">🪟 落地窗</button>
-                    <button onclick="setScene('beach.png', 'cover')">🏖️ 沙滩</button>
-                    <button onclick="setScene('mountain.png', 'cover')">⛰️ 山顶</button>
-                </div>
+            
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                <button onclick="setScene('pensive.png', 'contain')">🏺 冥想盆</button>
+                <button onclick="setScene('train.png', 'cover')">🚂 火车</button>
+                <button onclick="setScene('window.png', 'cover')">🪟 落地窗</button>
+                <button onclick="setScene('beach.png', 'cover')">🏖️ 沙滩</button>
+                <button onclick="setScene('mountain.png', 'cover')">⛰️ 山顶</button>
             </div>
         </div>
     </div>
@@ -99,44 +80,104 @@
     <audio id="audio" loop src="0.m4a"></audio>
 
     <script>
-        const audio = document.getElementById('audio');
+        const canvas = document.getElementById('rainCanvas');
+        const ctx = canvas.getContext('2d', { alpha: true });
         const viewport = document.getElementById('viewport');
-        const rain = document.getElementById('rain-layer');
-        const pbtn = document.getElementById('pbtn');
+        const audio = document.getElementById('audio');
+        
+        const imgMask = new Image(); imgMask.src = 'drop-color.png'; // 黑色模糊圆点
+        const imgAlpha = new Image(); imgAlpha.src = 'drop-alpha.png'; // 彩色调色板
+        const bgImg = new Image();
+
+        let drops = [];
+        const sprite = 5; // 5x5 矩阵
 
         function setScene(img, size) {
-            console.log("Setting scene to:", img);
-            // 解决图片加载不出来的终极办法：直接操作 style
-            viewport.style.backgroundImage = "url('" + img + "')";
+            viewport.style.backgroundImage = `url('${img}')`;
             viewport.style.backgroundSize = size;
+            bgImg.src = img;
         }
 
-        function sync() {
-            audio.volume = document.getElementById('v').value;
-            rain.style.opacity = document.getElementById('r').value;
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            initRain();
         }
 
-        function initAudio() {
-            if(audio.paused) {
-                audio.play();
-                pbtn.innerText = "STOP";
+        function initRain() {
+            drops = [];
+            const density = document.getElementById('den').value;
+            const sw = imgMask.width / sprite;
+            const sh = imgMask.height / sprite;
+
+            for (let i = 0; i < density; i++) {
+                drops.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    sx: Math.floor(Math.random() * sprite) * sw,
+                    sy: Math.floor(Math.random() * sprite) * sh,
+                    sw: sw, sh: sh,
+                    s: Math.random() * 0.2 + 0.15, 
+                    v: Math.random() * 1.5 + 0.5,
+                    a: Math.random() * 0.7 + 0.3
+                });
             }
         }
 
-        function toggleAudio(e) {
-            e.stopPropagation();
-            if(audio.paused) { audio.play(); pbtn.innerText = "STOP"; }
-            else { audio.pause(); pbtn.innerText = "PLAY"; }
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!bgImg.complete || !imgMask.complete) { requestAnimationFrame(draw); return; }
+
+            drops.forEach(d => {
+                const dw = d.sw * d.s;
+                const dh = dw * 1.2; // 关键：纵向拉伸，变“上尖下圆”
+
+                ctx.save();
+                ctx.translate(d.x, d.y);
+                ctx.globalAlpha = d.a;
+
+                // 1. 绘制折射层 (截取背景并反转位移)
+                ctx.save();
+                ctx.beginPath();
+                ctx.ellipse(dw/2, dh/2, dw/2, dh/2, 0, 0, Math.PI*2);
+                ctx.clip();
+                ctx.drawImage(bgImg, d.x, d.y - 15, dw, dh, 0, 0, dw, dh);
+                ctx.restore();
+
+                // 2. 使用黑色模糊点作为遮罩 (让边缘透明且圆润)
+                ctx.globalCompositeOperation = 'destination-in';
+                ctx.drawImage(imgMask, d.sx, d.sy, d.sw, d.sh, 0, 0, dw, dh);
+
+                // 3. 叠加彩色调色板 (产生边缘色散)
+                ctx.globalCompositeOperation = 'screen';
+                ctx.globalAlpha = 0.4;
+                ctx.drawImage(imgAlpha, d.sx, d.sy, d.sw, d.sh, 0, 0, dw, dh);
+
+                ctx.restore();
+
+                d.y += d.v;
+                if (d.y > canvas.height) {
+                    d.y = -dh;
+                    d.x = Math.random() * canvas.width;
+                }
+            });
+            requestAnimationFrame(draw);
         }
 
+        function sync() { audio.volume = document.getElementById('vol').value; }
+        function initAudio() { if(audio.paused) { audio.play(); pbtn.innerText = "STOP"; } }
+        function toggleAudio(e) { e.stopPropagation(); audio.paused ? audio.play() : audio.pause(); pbtn.innerText = audio.paused ? "PLAY" : "STOP"; }
+        
         function updateClock() {
             const now = new Date();
             document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour12: false});
         }
 
         window.onload = () => {
-            // 初始化背景
-            setScene('pensive.png', '500px');
+            setScene('pensive.png', 'contain');
+            window.addEventListener('resize', resize);
+            resize();
+            draw();
             setInterval(updateClock, 1000);
             updateClock();
         };
