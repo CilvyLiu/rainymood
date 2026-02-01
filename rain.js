@@ -157,7 +157,7 @@
         }
         this.dropCtx.globalAlpha = 1.0;
 
-        // 3. WebGL 最终渲染
+       // 3. WebGL 最终渲染
         const gl = this.gl;
         if (!gl) return;
         gl.useProgram(this.prog);
@@ -167,16 +167,19 @@
         gl.bindTexture(gl.TEXTURE_2D, this.texBg);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
+        // 将绘制了梭形雨滴的离屏画布上传为 WebGL 纹理
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.dropCanvas);
 
-        // 绑定参数：直接写数值防止找不到外部 config 变量
+        // 绑定参数：修正雨滴“隐形”问题
         const loc = (n) => gl.getUniformLocation(this.prog, n);
         gl.uniform1i(loc("u_bg"), 0);
         gl.uniform1i(loc("u_water"), 1);
-        gl.uniform1f(loc("u_br"), 1.1);         // 亮度
-        gl.uniform1f(loc("u_aMult"), 8.0);      // 对比度
-        gl.uniform1f(loc("u_aSub"), 1.2);       // 留痕持久度
-        gl.uniform1f(loc("u_ref"), 0.4);        // 折射
+
+        // --- 核心参数调优 ---
+        gl.uniform1f(loc("u_br"), 1.05);        // 亮度：稍微增强，保持通透感
+        gl.uniform1f(loc("u_aMult"), 15.0);    // 对比度：大幅调高，让雨滴边缘更清晰实体化
+        gl.uniform1f(loc("u_aSub"), 0.45);     // 扣除值：调低！这是显形的关键，数值越低雨滴越明显
+        gl.uniform1f(loc("u_ref"), 0.35);      // 折射率：略微调低，防止背景扭曲过于细碎
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         requestAnimationFrame(this.loop.bind(this));
