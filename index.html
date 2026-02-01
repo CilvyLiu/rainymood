@@ -2,8 +2,25 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nova's Pensieve - WebGL Ultra</title>
     <link rel="stylesheet" href="rain.css">
+    <style>
+        /* 确保背景容器覆盖全屏且在最底层 */
+        #container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            background-color: #000;
+        }
+        /* 防止点击 UI 时触发 initAudio 的冒泡 */
+        .bottom-bar, .side-nav, .center-container {
+            z-index: 10;
+        }
+    </style>
 </head>
 <body onclick="initAudio()">
 
@@ -11,10 +28,10 @@
     <div id="overlay"></div>
 
     <div class="side-nav">
-        <a href="https://gringott.streamlit.app/" target="_blank" class="nav-item">🏦</a>
-        <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-item">🐾</a>
-        <a href="https://newscil.streamlit.app/" target="_blank" class="nav-item">📜</a>
-        <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-item">🔮</a>
+        <a href="https://gringott.streamlit.app/" target="_blank" class="nav-item" title="古灵阁">🏦</a>
+        <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-item" title="奇兽饲育">🐾</a>
+        <a href="https://newscil.streamlit.app/" target="_blank" class="nav-item" title="预言家日报">📜</a>
+        <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-item" title="占卜课">🔮</a>
     </div>
 
     <div class="center-container">
@@ -32,8 +49,11 @@
 
     <div class="bottom-bar">
         <div id="clock">00:00:00</div>
-        <label>VOLUME</label> 
-        <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()">
+        
+        <div class="control-group">
+            <label>VOL</label> 
+            <input type="range" id="vol" min="0" max="1" step="0.05" value="0.5" oninput="sync()">
+        </div>
         
         <select id="weatherSelect" onchange="changeWeather()">
             <option value="rain">🌧️ 细雨</option>
@@ -49,6 +69,7 @@
             <option value="beach.png">🏖️ 贝壳小屋</option>
             <option value="mountain.png">🏔️ 雪山</option>
         </select>
+        
         <button id="pbtn" onclick="toggleAudio(event)">▶</button>
     </div>
 
@@ -59,25 +80,38 @@
         const audio = document.getElementById('audio');
         const pbtn = document.getElementById('pbtn');
 
+        // 切换背景场景
         function changeScene() {
-            const scene = document.getElementById('sceneSelect').value;
-            if(window.rainEngine) window.rainEngine.updateBackground(scene);
-        }
-
-        function changeWeather() {
-            const weather = document.getElementById('weatherSelect').value;
-            if(window.rainEngine) {
-                const settings = {
-                    rain: { chance: 0.2, speed: 2 },
-                    storm: { chance: 0.6, speed: 5 },
-                    drizzle: { chance: 0.1, speed: 1.5 },
-                    sunny: { chance: 0, speed: 0 }
-                };
-                window.rainEngine.options.rainChance = settings[weather].chance;
-                window.rainEngine.drops.forEach(d => d.v = settings[weather].speed + Math.random());
+            const sceneUrl = document.getElementById('sceneSelect').value;
+            if(window.changeScene) {
+                // 调用 rain.js 暴露的全局函数
+                window.changeScene(sceneUrl);
             }
         }
 
+        // 切换天气参数
+        function changeWeather() {
+            const weather = document.getElementById('weatherSelect').value;
+            if(window.rainEngine && window.rainEngine.raindrops) {
+                const config = {
+                    rain:    { chance: 0.3, minR: 15, maxR: 40 },
+                    storm:   { chance: 0.7, minR: 20, maxR: 50 },
+                    drizzle: { chance: 0.1, minR: 5,  maxR: 20 },
+                    sunny:   { chance: 0,   minR: 0,  maxR: 0 }
+                };
+                const opt = config[weather];
+                const target = window.rainEngine.raindrops.options;
+                
+                target.rainChance = opt.chance;
+                target.minR = opt.minR;
+                target.maxR = opt.maxR;
+                
+                // 清理旧雨滴，平滑过渡
+                if(weather === 'sunny') window.rainEngine.raindrops.drops = [];
+            }
+        }
+
+        // 看板显隐控制
         function toggleRules(e) {
             e.stopPropagation();
             const card = document.getElementById('mainRule');
@@ -86,20 +120,39 @@
             e.target.innerText = isHidden ? 'RELEASE' : 'FOCUS MODE';
         }
 
-        function sync() { audio.volume = document.getElementById('vol').value; }
-        function initAudio() { if(audio.paused) { audio.play(); pbtn.innerText = "⏸"; } }
-        function toggleAudio(e) { 
-            e.stopPropagation(); 
-            audio.paused ? audio.play() : audio.pause(); 
-            pbtn.innerText = audio.paused ? "▶" : "⏸"; 
+        // 音频控制
+        function sync() { 
+            audio.volume = document.getElementById('vol').value; 
         }
 
+        function initAudio() { 
+            if(audio.paused) { 
+                audio.play(); 
+                pbtn.innerText = "⏸"; 
+            } 
+        }
+
+        function toggleAudio(e) { 
+            e.stopPropagation(); 
+            if (audio.paused) {
+                audio.play();
+                pbtn.innerText = "⏸";
+            } else {
+                audio.pause();
+                pbtn.innerText = "▶";
+            }
+        }
+
+        // 时钟刷新
         function updateClock() {
             const now = new Date();
             document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour12: false});
         }
         setInterval(updateClock, 1000);
         updateClock();
+
+        // 初始化音量
+        sync();
     </script>
 </body>
 </html>
