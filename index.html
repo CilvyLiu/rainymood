@@ -7,26 +7,9 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏺</text></svg>">
     <link rel="stylesheet" href="rain.css">
     <style>
-        /* 核心层级：WebGL 在最底层，Overlay 提供氛围感 */
-        #container {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            z-index: 1; /* 改为 1，确保在黑色 body 之上 */
-            background-color: #000;
-        }
-        #overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            z-index: 2;
-            pointer-events: none; /* 让点击穿透到 body */
-            background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.4) 100%);
-        }
-        /* UI 元素必须在最上方 */
-        .side-nav, .center-container, .bottom-bar {
-            z-index: 100 !important;
-        }
+        #container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; background-color: #000; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.4) 100%); }
+        .side-nav, .center-container, .bottom-bar { z-index: 100 !important; }
     </style>
 </head>
 <body onclick="initAudio()">
@@ -56,7 +39,6 @@
 
     <div class="bottom-bar">
         <div id="clock">00:00:00</div>
-        
         <div class="control-group">
             <label>VOL</label> 
             <input type="range" id="vol" min="0" max="1" step="0.05" value="0.5" oninput="sync()">
@@ -76,66 +58,69 @@
             <option value="beach.png">🏖️ 贝壳小屋</option>
             <option value="mountain.png">🏔️ 雪山</option>
         </select>
-        
         <button id="pbtn" onclick="toggleAudio(event)">▶</button>
     </div>
 
-    <audio id="audio" loop src="0.m4a"></audio>
+    <audio id="audio_bg" loop src="0.m4a"></audio>
+    <audio id="audio_scene" loop></audio>
 
-   <script src="rain.js"></script>
-<script>
-    const audio = document.getElementById('audio');
-    const pbtn = document.getElementById('pbtn');
+    <script src="rain.js"></script>
+    <script>
+        const abg = document.getElementById('audio_bg');
+        const asc = document.getElementById('audio_scene');
+        const pbtn = document.getElementById('pbtn');
 
-    // 只需要保留 UI 交互逻辑，核心渲染逻辑交给 rain.js
-    window.initAudio = function() { 
-        if(audio.paused) { 
-            audio.play().catch(e => console.log("等待交互...")); 
-            pbtn.innerText = "⏸"; 
-        } 
-    };
+        window.initAudio = function() { 
+            if(abg.paused) { 
+                abg.play();
+                if(asc.src) asc.play();
+                pbtn.innerText = "⏸"; 
+            } 
+        };
 
-    // 音频同步滑动条
-    function sync() { 
-        audio.volume = document.getElementById('vol').value; 
-    }
+        window.toggleAudio = function(e) {
+            e.stopPropagation();
+            if (abg.paused) {
+                abg.play();
+                if(asc.src) asc.play();
+                pbtn.innerText = "⏸";
+            } else {
+                abg.pause();
+                asc.pause();
+                pbtn.innerText = "▶";
+            }
+        };
 
-    // 天气切换逻辑（可以保留在这里，因为它直接操作 rainEngine 的数值）
-    function changeWeather() {
-        const weather = document.getElementById('weatherSelect').value;
-        if(window.rainEngine && window.rainEngine.raindrops) {
-            const config = {
-                rain:    { chance: 0.3, minR: 15, maxR: 40 },
-                storm:   { chance: 0.7, minR: 20, maxR: 50 },
-                drizzle: { chance: 0.1, minR: 5,  maxR: 20 },
-                sunny:   { chance: 0,   minR: 0,  maxR: 0 }
-            };
-            const opt = config[weather];
-            const target = window.rainEngine.raindrops.options;
-            target.rainChance = opt.chance;
-            target.minR = opt.minR;
-            target.maxR = opt.maxR;
-            if(weather === 'sunny') window.rainEngine.raindrops.drops = [];
+        function sync() { 
+            abg.volume = asc.volume = document.getElementById('vol').value; 
         }
-    }
 
-    // 看板显隐
-    function toggleRules(e) {
-        e.stopPropagation();
-        const card = document.getElementById('mainRule');
-        const isHidden = getComputedStyle(card).display === 'none';
-        card.style.display = isHidden ? 'block' : 'none';
-        e.target.innerText = isHidden ? 'RELEASE' : 'FOCUS MODE';
-    }
+        function changeWeather() {
+            const weather = document.getElementById('weatherSelect').value;
+            if(window.rainEngine) {
+                const config = {
+                    rain: { chance: 0.5, minR: 15, maxR: 40 },
+                    storm: { chance: 0.9, minR: 25, maxR: 55 },
+                    drizzle: { chance: 0.2, minR: 10, maxR: 25 },
+                    sunny: { chance: 0, minR: 0, maxR: 0 }
+                };
+                const opt = config[weather];
+                window.rainEngine.raindrops.options.rainChance = opt.chance;
+            }
+        }
 
-    // 时钟
-    function updateClock() {
-        const now = new Date();
-        document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour12: false});
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-    sync();
-</script>
+        function toggleRules(e) {
+            e.stopPropagation();
+            const card = document.getElementById('mainRule');
+            card.style.display = card.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function updateClock() {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString('zh-CN', {hour12: false});
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+        sync();
+    </script>
 </body>
 </html>
