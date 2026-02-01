@@ -78,29 +78,38 @@
     };
 
     RainRenderer.prototype.resize = function() {
-        this.width = window.innerWidth;
-        this.height = window.innerHeight;
-        this.canvas.style.width = this.width + 'px';
-        this.canvas.style.height = this.height + 'px';
-        this.canvas.width = this.dropCanvas.width = this.width * this.ratio;
-        this.canvas.height = this.dropCanvas.height = this.height * this.ratio;
-        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    };
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
+    this.canvas.style.width = this.width + 'px';
+    this.canvas.style.height = this.height + 'px';
+    
+    // 关键点：统一物理像素尺寸
+    const w = this.width * this.ratio;
+    const h = this.height * this.ratio;
+    this.canvas.width = this.dropCanvas.width = w;
+    this.canvas.height = this.dropCanvas.height = h;
+    
+    this.gl.viewport(0, 0, w, h);
+};
 
     RainRenderer.prototype.updateBackground = function(url) {
-        const gl = this.gl;
-        const img = new Image();
-        img.onload = () => {
-            gl.bindTexture(gl.TEXTURE_2D, this.texBg);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        };
-        img.src = url;
+    const gl = this.gl;
+    const img = new Image();
+    img.crossOrigin = "anonymous"; // 允许跨域图片渲染到 WebGL
+    img.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        // 背景通常不需要重复，且需要线性过滤保证平滑
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     };
+    img.src = url;
+};
 
     RainRenderer.prototype.loop = function() {
+        // 1. 逻辑更新：生成新雨滴
         if (Math.random() < this.options.rainChance) {
             this.drops.push({
                 x: Math.random() * this.dropCanvas.width,
@@ -110,20 +119,32 @@
             });
         }
 
+        // 2. 离屏绘制：将所有雨滴画到 dropCanvas 上
         this.dropCtx.clearRect(0, 0, this.dropCanvas.width, this.dropCanvas.height);
         for (let i = this.drops.length - 1; i >= 0; i--) {
-            let d = this.drops[i]; d.y += d.v;
+            let d = this.drops[i]; 
+            d.y += d.v;
             this.dropCtx.drawImage(this.dropImg, d.x - d.r, d.y - d.r, d.r * 2, d.r * 2);
+            // 性能优化：移出屏幕后清理
             if (d.y > this.dropCanvas.height + 100) this.drops.splice(i, 1);
         }
 
         const gl = this.gl;
+
+        // 3. WebGL 更新：上传雨滴贴图
+        gl.activeTexture(gl.TEXTURE1); // 必须先指定单元
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.dropCanvas);
+        // 增加这三行，确保纹理在各种分辨率下都能正常采样
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texBg);
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texWater);
+        // 4. 渲染配置：关联 Uniform 变量
+        gl.useProgram(this.prog);
+        
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
         
         gl.uniform1i(gl.getUniformLocation(this.prog, "u_bg"), 0);
         gl.uniform1i(gl.getUniformLocation(this.prog, "u_water"), 1);
@@ -132,22 +153,32 @@
         gl.uniform1f(gl.getUniformLocation(this.prog, "u_aSub"), config.alphaSubtract);
         gl.uniform1f(gl.getUniformLocation(this.prog, "u_ref"), config.refraction);
 
+        // 5. 绘制
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         requestAnimationFrame(this.loop.bind(this));
     };
 
     window.addEventListener('load', () => {
-        const renderer = new RainRenderer(document.getElementById('container'));
+        const container = document.getElementById('container');
+        if(!container) return; // 容错处理
+
+        const renderer = new RainRenderer(container);
         renderer.updateBackground('pensive.png');
         window.rainEngine = renderer;
+        
         window.addEventListener('resize', () => renderer.resize());
 
         // 对接 HTML 的函数
         window.changeScene = (url) => {
             renderer.updateBackground(url);
             const asc = document.getElementById('audio_scene');
-            if(url === 'pensive.png') asc.pause();
-            else { asc.src = url.split('.')[0] + '.m4a'; asc.play().catch(()=>{}); }
+            if(!asc) return;
+            if(url === 'pensive.png') {
+                asc.pause();
+            } else {
+                // 假设音频文件名与图片名对应 (e.g., train.png -> train.m4a)
+                asc.src = url.split('.')[0] + '.m4a';
+                asc.play().catch(() => { console.log("等待用户交互后播放音频"); });
+            }
         };
     });
-})();
