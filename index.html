@@ -96,18 +96,18 @@
         }
 
         function changeWeather() {
-            const weather = document.getElementById('weatherSelect').value;
-            if(window.rainEngine) {
-                const config = {
-                    rain: { chance: 0.5, minR: 15, maxR: 40 },
-                    storm: { chance: 0.9, minR: 25, maxR: 55 },
-                    drizzle: { chance: 0.2, minR: 10, maxR: 25 },
-                    sunny: { chance: 0, minR: 0, maxR: 0 }
-                };
-                const opt = config[weather];
-                window.rainEngine.raindrops.options.rainChance = opt.chance;
-            }
+        const weather = document.getElementById('weatherSelect').value;
+        if(window.rainEngine) {
+            const config = {
+                rain: { chance: 0.5 },
+                storm: { chance: 0.9 },
+                drizzle: { chance: 0.2 },
+                sunny: { chance: 0 }
+            };
+            // 修正属性访问：rainEngine.options 而不是 raindrops.options
+            window.rainEngine.options.rainChance = config[weather].chance;
         }
+    }
 
         function toggleRules(e) {
             e.stopPropagation();
