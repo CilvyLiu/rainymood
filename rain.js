@@ -17,18 +17,20 @@
         const ctx = canvas.getContext('2d');
         const center = size / 2;
         
-        // 关键：创建一个非常“厚实”的径向渐变
-        const grad = ctx.createRadialGradient(center, center, 0, center, center, center);
+        // 清除画布
+        ctx.clearRect(0, 0, size, size);
         
-        // 增加 B 通道（高光）和 Alpha（厚度）
-        grad.addColorStop(0, 'rgba(128, 128, 255, 1.0)'); 
-        grad.addColorStop(0.7, 'rgba(128, 128, 255, 0.8)'); // 让实体部分更大
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); 
+        const grad = ctx.createRadialGradient(center, center, 0, center, center, center);
+        grad.addColorStop(0, 'rgba(128, 128, 255, 1.0)'); // 中心厚
+        grad.addColorStop(0.7, 'rgba(128, 128, 255, 0.8)'); // 边缘实
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');           // 完全透明
         
         ctx.fillStyle = grad;
+        // 关键点：只画一个圆，而不是 fillRect
         ctx.beginPath();
         ctx.arc(center, center, center, 0, Math.PI * 2);
         ctx.fill();
+        
         return canvas;
     }
     function RainRenderer(container) {
