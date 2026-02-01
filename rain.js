@@ -129,19 +129,19 @@
         img.src = url;
     };
 
-    RainRenderer.prototype.loop = function() {
-        // 1. 生成新雨滴
+   RainRenderer.prototype.loop = function() {
+        // 1. 生成新雨滴：确保读取最新的 options
         if (Math.random() < this.options.rainChance) {
             this.drops.push({
                 x: Math.random() * this.dropCanvas.width,
                 y: -100,
+                // 实时计算半径和速度
                 r: (Math.random() * (this.options.maxR - this.options.minR) + this.options.minR) * this.ratio,
                 v: ((this.options.baseSpeed || 4) + Math.random() * 2) * this.ratio
             });
         }
 
-        // 2. 离屏绘制：实现拖尾水痕的核心
-        // 用半透明黑色填充，而不擦除，使上一帧留下一丝影迹
+        // 2. 离屏绘制：拖尾水痕
         this.dropCtx.fillStyle = 'rgba(0, 0, 0, 0.18)'; 
         this.dropCtx.fillRect(0, 0, this.dropCanvas.width, this.dropCanvas.height);
 
@@ -150,39 +150,39 @@
             let d = this.drops[i];
             d.y += d.v; 
             
-            // 绘制为梭形：宽度变窄，长度拉伸 2.5 倍
+            // --- 修复位置：补齐了闭括号 ) 并微调了梭形比例 ---
             this.dropCtx.drawImage(
                 this.dropImg, 
                 d.x - d.r * 0.6, d.y - d.r, 
-                d.r * 1.2, d.r * 2.2 // 稍微变胖一点，显形更明显
+                d.r * 1.2, d.r * 2.2
+            ); 
 
-            if (d.y > this.dropCanvas.height + 100) this.drops.splice(i, 1);
+            if (d.y > this.dropCanvas.height + 100) {
+                this.drops.splice(i, 1);
+            }
         }
         this.dropCtx.globalAlpha = 1.0;
 
-       // 3. WebGL 最终渲染
+        // 3. WebGL 最终渲染
         const gl = this.gl;
         if (!gl) return;
         gl.useProgram(this.prog);
 
-        // 绑定纹理
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.texBg);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
-        // 将绘制了梭形雨滴的离屏画布上传为 WebGL 纹理
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.dropCanvas);
 
-        // 绑定参数：修正雨滴“隐形”问题
         const loc = (n) => gl.getUniformLocation(this.prog, n);
         gl.uniform1i(loc("u_bg"), 0);
         gl.uniform1i(loc("u_water"), 1);
 
-        // --- 核心参数调优 ---
-        gl.uniform1f(loc("u_br"), 1.05);        // 亮度：稍微增强，保持通透感
-        gl.uniform1f(loc("u_aMult"), 15.0);    // 对比度：大幅调高，让雨滴边缘更清晰实体化
-        gl.uniform1f(loc("u_aSub"), 0.45);     // 扣除值：调低！这是显形的关键，数值越低雨滴越明显
-        gl.uniform1f(loc("u_ref"), 0.35);      // 折射率：略微调低，防止背景扭曲过于细碎
+        // --- 参数调优：显形的关键 ---
+        gl.uniform1f(loc("u_br"), 1.1);        // 略微调高亮度
+        gl.uniform1f(loc("u_aMult"), 18.0);    // 极高对比度，让雨滴边缘锐利
+        gl.uniform1f(loc("u_aSub"), 0.25);     // 再次调低扣除值，确保小雨滴也能看见
+        gl.uniform1f(loc("u_ref"), 0.4);       // 适度折射
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         requestAnimationFrame(this.loop.bind(this));
@@ -198,6 +198,7 @@
         
         window.addEventListener('resize', () => renderer.resize());
 
+        // 场景切换逻辑
         window.changeScene = (url) => {
             renderer.updateBackground(url);
             const asc = document.getElementById('audio_scene');
@@ -205,6 +206,7 @@
             if(url === 'pensive.png') {
                 asc.pause();
             } else {
+                // 确保音频路径与场景名对应
                 asc.src = url.split('.')[0] + '.m4a';
                 asc.play().catch(() => {});
             }
