@@ -91,7 +91,7 @@
     RainRenderer.prototype.init = function() {
         var gl = this.gl;
         var vs = 'attribute vec2 p;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=p*0.5+0.5;v.y=1.0-v.y;}';
-        var fs = 'precision mediump float;varying vec2 v;uniform sampler2D b,w;void main(){vec4 r=texture2D(w,v);vec2 o=(r.rg-0.5)*0.15;if(r.a>0.05){gl_FragColor=texture2D(b,v+o)+r.b*0.15;}else{gl_FragColor=texture2D(b,v);}}';
+        var fs = 'precision mediump float;varying vec2 v;uniform sampler2D b,w;void main(){vec4 r=texture2D(w,v);vec2 o=(r.rg-0.5)*0.25;if(r.a>0.05){gl_FragColor=texture2D(b,v+o)+r.b*0.15;}else{gl_FragColor=texture2D(b,v);}}';
         var prog = gl.createProgram();
         ['VERTEX_SHADER','FRAGMENT_SHADER'].forEach(function(type,i){
             var sh = gl.createShader(gl[type]); 
@@ -189,6 +189,29 @@
                 console.error("图片加载失败:", sceneUrl);
             };
             img.src = sceneUrl;
+        };
+        // 在约 186 行 window.changeScene 的结尾后面添加：
+        window.initAudio = function() {
+            const audio = document.getElementById('audio');
+            const pbtn = document.getElementById('pbtn');
+            if (audio && audio.paused) {
+                audio.play().catch(e => console.log("音频播放需用户交互:", e));
+                if (pbtn) pbtn.innerText = "⏸";
+            }
+        };
+
+        window.toggleAudio = function(e) {
+            if (e) e.stopPropagation();
+            const audio = document.getElementById('audio');
+            const pbtn = document.getElementById('pbtn');
+            if (!audio) return;
+            if (audio.paused) {
+                audio.play();
+                if (pbtn) pbtn.innerText = "⏸";
+            } else {
+                audio.pause();
+                if (pbtn) pbtn.innerText = "▶";
+            }
         };
     });
 })();
