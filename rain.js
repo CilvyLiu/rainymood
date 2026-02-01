@@ -219,7 +219,7 @@
                 asc.pause();
             } else {
                 // 确保音频路径与场景名对应
-                asc.src = url.split('.')[0] + '.m4a';
+                asc.src = url.split('.')[0] + '.mp3';
                 asc.play().catch(() => {});
             }
         };
