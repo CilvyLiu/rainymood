@@ -7,86 +7,69 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: serif; }
 
-        /* 基础场景层 */
         #main-stage {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url("pensive.png") center center no-repeat;
-            background-size: cover;
+            background-size: cover; z-index: 1;
             transition: background-image 1.5s ease-in-out;
-            z-index: 1;
         }
 
-        /* 动态雨幕层 */
-        #rain-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 200%; /* 高度设为200%方便循环滚动 */
+        /* 细雨层：两层叠加产生景深 */
+        .rain {
+            position: absolute; top: -100%; left: -10%; width: 120%; height: 200%;
             background: url("stardust.png") repeat;
-            background-size: 300px;
-            opacity: 0.6;
-            z-index: 3;
-            pointer-events: none;
-            mix-blend-mode: plus-lighter;
-            /* 注入动画：4秒落下一屏，无限循环 */
-            animation: rain-fall 4s linear infinite;
+            pointer-events: none; z-index: 3;
+            mix-blend-mode: screen;
         }
 
-        /* 定义下落动画 */
-        @keyframes rain-fall {
-            from { transform: translateY(-50%); }
-            to { transform: translateY(0); }
+        /* 第一层：极细密的底雨 */
+        #rain-1 {
+            background-size: 150px; /* 颗粒极小 */
+            opacity: 0.3;
+            animation: fine-rain 3s linear infinite;
         }
 
-        /* 模糊滤镜层 (模拟雾化玻璃) */
+        /* 第二层：稍明显的斜掠雨 */
+        #rain-2 {
+            background-size: 250px;
+            opacity: 0.2;
+            animation: fine-rain 2s linear infinite;
+            filter: blur(1px); /* 模糊处理，增加距离感 */
+        }
+
+        @keyframes fine-rain {
+            from { transform: translate(0, 0); }
+            to { transform: translate(15px, 50%); } /* 向右下斜落 */
+        }
+
         #glass-mask {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(2px); /* 淡淡的模糊，更有氛围 */
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(3px); /* 强化雾气感 */
             z-index: 2;
-            pointer-events: none;
         }
 
-        /* UI 布局 */
-        .content {
-            position: relative; z-index: 10;
-            width: 100%; height: 100%;
-            display: flex; flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
-            padding: 40px 20px; box-sizing: border-box;
-        }
-
-        .header h1 { letter-spacing: 12px; font-weight: 200; margin: 0; font-size: 28px; opacity: 0.8; }
-        
+        /* UI 保持一致 */
+        .content { position: relative; z-index: 10; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 40px 20px; box-sizing: border-box; }
         .nav-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; width: 100%; max-width: 600px; }
         @media (max-width: 600px) { .nav-grid { grid-template-columns: repeat(2, 1fr); } }
-
-        .nav-card {
-            background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px; padding: 15px; text-align: center; 
-            text-decoration: none; color: white; backdrop-filter: blur(10px); transition: 0.3s;
-        }
-        .nav-card:hover { background: rgba(255, 255, 255, 0.1); border-color: #fff; }
-
-        .controls-panel {
-            background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 30px;
-            border: 1px solid rgba(255,255,255,0.2);
-            display: flex; flex-direction: column; gap: 15px; width: 90%; max-width: 400px;
-        }
-
+        .nav-card { background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; text-align: center; text-decoration: none; color: white; backdrop-filter: blur(10px); transition: 0.3s; }
+        .controls-panel { background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.2); display: flex; flex-direction: column; gap: 15px; width: 90%; max-width: 400px; }
         .sliders { display: flex; justify-content: space-around; align-items: center; }
         button { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; }
-        input[type=range] { accent-color: #fff; }
     </style>
 </head>
 <body onclick="autoPlay()">
 
     <div id="main-stage">
         <div id="glass-mask"></div>
-        <div id="rain-layer"></div>
+        <div id="rain-1" class="rain"></div>
+        <div id="rain-2" class="rain"></div>
     </div>
 
     <div class="content">
         <div class="header">
-            <h1>THE PENSIEVE</h1>
+            <h1 style="letter-spacing: 12px; font-weight: 200;">THE PENSIEVE</h1>
             <p id="clock" style="opacity: 0.5; font-size: 12px; margin-top: 10px;"></p>
         </div>
 
@@ -100,15 +83,15 @@
         <div class="controls-panel">
             <div class="sliders">
                 <span>🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
-                <span>🌧️ <input type="range" id="rain" min="0" max="1" step="0.1" value="0.6" oninput="sync()"></span>
+                <span>🌧️ <input type="range" id="rain-ctrl" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
                 <button id="pbtn" onclick="toggle(event)">PLAY</button>
             </div>
             <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-                <button onclick="change('pensive.png')">🏺 冥想</button>
-                <button onclick="change('train.png')">🚂 火车</button>
-                <button onclick="change('window.png')">🪟 窗边</button>
-                <button onclick="change('beach.png')">🏖️ 沙滩</button>
-                <button onclick="change('mountain.png')">⛰️ 山巅</button>
+                <button onclick="change('pensive.png')">1</button>
+                <button onclick="change('train.png')">2</button>
+                <button onclick="change('window.png')">3</button>
+                <button onclick="change('beach.png')">4</button>
+                <button onclick="change('mountain.png')">5</button>
             </div>
         </div>
     </div>
@@ -118,23 +101,20 @@
     <script>
         const audio = document.getElementById('audio');
         const stage = document.getElementById('main-stage');
-        const rain = document.getElementById('rain-layer');
         const pbtn = document.getElementById('pbtn');
+        const r1 = document.getElementById('rain-1');
+        const r2 = document.getElementById('rain-2');
 
-        function change(img) {
-            stage.style.backgroundImage = "url('" + img + "')";
-        }
-
+        function change(img) { stage.style.backgroundImage = "url('" + img + "')"; }
+        
         function sync() {
             audio.volume = document.getElementById('vol').value;
-            rain.style.opacity = document.getElementById('rain').value;
+            const op = document.getElementById('rain-ctrl').value;
+            r1.style.opacity = op * 0.6;
+            r2.style.opacity = op * 0.4;
         }
 
-        function autoPlay() {
-            if(audio.paused) {
-                audio.play().then(() => pbtn.innerText = "STOP").catch(e => {});
-            }
-        }
+        function autoPlay() { if(audio.paused) { audio.play().then(() => pbtn.innerText = "STOP").catch(e => {}); } }
 
         function toggle(e) {
             e.stopPropagation();
@@ -142,10 +122,7 @@
             else { audio.pause(); pbtn.innerText = "PLAY"; }
         }
 
-        setInterval(() => {
-            document.getElementById('clock').innerText = new Date().toLocaleString();
-        }, 1000);
-
+        setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
         window.onload = () => { sync(); };
     </script>
 </body>
