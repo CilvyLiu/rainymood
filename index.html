@@ -2,31 +2,56 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Nova's Pensieve - Advanced Zen</title>
+    <title>Nova's Pensieve - Ultimate Physics</title>
     <style>
-        :root { --glass: rgba(0, 0, 0, 0.6); --border: rgba(255, 255, 255, 0.15); }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "PingFang SC", serif; }
+        :root { 
+            --glass: rgba(255, 255, 255, 0.05); 
+            --blur: blur(20px); 
+            --border: rgba(255, 255, 255, 0.1); 
+        }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "PingFang SC", sans-serif; }
         
-        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: background-image 1s; filter: blur(5px) brightness(0.7); }
+        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: 1s; filter: blur(8px) brightness(0.6); }
         #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.3); z-index: 2; pointer-events: none; }
-        
-        .content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 40px 0; box-sizing: border-box; }
-        
-        /* 折叠菜单样式 */
-        .collapsible-nav { display: none; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; width: 280px; }
-        .nav-card { background: var(--glass); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; text-decoration: none; color: #ccc; backdrop-filter: blur(10px); font-size: 12px; transition: 0.3s; }
-        .nav-card:hover { color: white; border-color: #fff; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.4) 100%); z-index: 2; pointer-events: none; }
 
-        /* 看板纪律样式 */
-        #ruleBook { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 20; width: 200px; }
-        .rule-content { display: none; background: rgba(20, 20, 20, 0.9); border: 1px solid #555; padding: 15px; border-radius: 10px; font-size: 12px; line-height: 1.8; color: #ddd; margin-bottom: 10px; }
+        /* 左侧导航 */
+        .side-nav { position: fixed; left: 30px; top: 50%; transform: translateY(-50%); z-index: 100; display: flex; flex-direction: column; gap: 15px; }
+        .nav-item { 
+            width: 50px; height: 50px; background: var(--glass); backdrop-filter: var(--blur); 
+            border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; 
+            justify-content: center; text-decoration: none; font-size: 20px; transition: 0.3s;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.1); transform: scale(1.1); border-color: #fff; }
 
-        /* 控制区样式 */
-        .controls { background: rgba(0, 0, 0, 0.7); padding: 10px 20px; border-radius: 50px; display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); }
-        select, button { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white; padding: 5px 12px; border-radius: 15px; cursor: pointer; font-size: 11px; }
-        select option { background: #111; }
-        input[type=range] { accent-color: #fff; width: 50px; }
+        /* 正中间纪律 */
+        .center-container { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; width: 400px; }
+        .rule-card { 
+            background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(25px); 
+            border: 1px solid var(--border); border-radius: 20px; padding: 30px;
+            display: none; transition: 0.5s; margin-bottom: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .rule-card h2 { letter-spacing: 5px; font-weight: 300; margin-bottom: 20px; color: #fff; }
+        .rule-card p { font-size: 14px; line-height: 2.2; color: #ccc; text-align: left; }
+
+        /* 底部控制栏 */
+        .bottom-bar { 
+            position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 100;
+            display: flex; align-items: center; gap: 20px; background: var(--glass);
+            backdrop-filter: var(--blur); padding: 12px 30px; border-radius: 50px; border: 1px solid var(--border);
+        }
+
+        button.magic-btn { 
+            background: transparent; border: 1px solid #fff; color: #fff; 
+            padding: 8px 25px; border-radius: 20px; cursor: pointer; font-size: 12px;
+            letter-spacing: 2px; transition: 0.3s;
+        }
+        button.magic-btn:hover { background: #fff; color: #000; }
+
+        select { background: transparent; color: #fff; border: 1px solid var(--border); padding: 5px 10px; border-radius: 10px; font-size: 12px; outline: none; }
+        input[type=range] { accent-color: #fff; cursor: pointer; vertical-align: middle; width: 80px; }
+        label { font-size: 11px; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; }
     </style>
 </head>
 <body onclick="initAudio()">
@@ -35,44 +60,37 @@
     <div id="overlay"></div>
     <canvas id="rainCanvas"></canvas>
 
-    <div id="ruleBook">
-        <div class="rule-content" id="ruleText">
-            <b>📜 看板纪律</b><br><hr style="opacity:0.2">
-            1. 沉浸思考，拒绝浮躁<br>
-            2. 数据为骨，直觉为翼<br>
-            3. 每日三省，复盘得失<br>
-            4. 保持敬畏，不断进化
-        </div>
-        <button onclick="toggleElement('ruleText', event)" style="width:100%">⚖️ 看板纪律</button>
+    <div class="side-nav">
+        <a href="https://gringott.streamlit.app/" target="_blank" class="nav-item" title="古灵阁">🏦</a>
+        <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-item" title="嗅嗅探测">🐾</a>
+        <a href="https://newscil.streamlit.app/" target="_blank" class="nav-item" title="预言日报">📜</a>
+        <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-item" title="战略看板">🔮</a>
     </div>
 
-    <div class="content">
-        <div style="text-align: center;">
-            <h1 style="letter-spacing: 12px; font-weight: 200; margin: 0; font-size: 24px;">THE PENSIEVE</h1>
-            <div id="clock" style="font-size: 12px; opacity: 0.5; letter-spacing: 2px; margin-top: 8px;"></div>
+    <div class="center-container">
+        <div class="rule-card" id="mainRule">
+            <h2>看板纪律</h2>
+            <p>
+                1. <b>深潜</b>：进入冥想盆，剥离情绪干扰。<br>
+                2. <b>精准</b>：每一行数据背后都是真实的逻辑。<br>
+                3. <b>韧性</b>：在波动的雨幕中寻找恒定的趋势。<br>
+                4. <b>进化</b>：复盘是通往大师之路的唯一阶梯。
+            </p>
         </div>
+        <button class="magic-btn" onclick="toggleRules(event)">📜 OPEN RULES</button>
+    </div>
 
-        <div style="display: flex; flex-direction: column; align-items: center;">
-            <div class="collapsible-nav" id="navGrid">
-                <a href="https://gringott.streamlit.app/" target="_blank" class="nav-card">🏦 古灵阁</a>
-                <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-card">🐾 嗅嗅探测</a>
-                <a href="https://newscil.streamlit.app/" target="_blank" class="nav-card">📜 预言日报</a>
-                <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card">🔮 战略看板</a>
-            </div>
-            <button onclick="toggleElement('navGrid', event)" style="padding: 10px 30px; border-color: #fff;">🪄 魔法传送门</button>
-        </div>
-
-        <div class="controls">
-            <span>🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
-            <select onchange="handleSceneChange(this)">
-                <option value="pensive.png|contain">🏺 冥想盆</option>
-                <option value="train.png|cover">🚂 霍格沃茨特快</option>
-                <option value="window.png|cover">🪟 落地窗前</option>
-                <option value="beach.png|cover">🏖️ 贝壳小屋</option>
-                <option value="mountain.png|cover">⛰️ 禁林山巅</option>
-            </select>
-            <button id="pbtn" onclick="toggleAudio(event)">PLAY</button>
-        </div>
+    <div class="bottom-bar">
+        <div id="clock" style="font-size: 14px; letter-spacing: 1px; margin-right: 15px; font-weight: 200;"></div>
+        <label>VOL</label> <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()">
+        <label>RAIN</label> <input type="range" id="den" min="10" max="200" value="80" oninput="initRain()">
+        <select onchange="handleSceneChange(this)">
+            <option value="pensive.png|contain">🏺 冥想盆</option>
+            <option value="train.png|cover">🚂 霍格沃茨特快</option>
+            <option value="window.png|cover">🪟 落地窗前</option>
+            <option value="beach.png|cover">🏖️ 贝壳小屋</option>
+        </select>
+        <button id="pbtn" onclick="toggleAudio(event)" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">▶</button>
     </div>
 
     <audio id="audio" loop src="0.m4a"></audio>
@@ -82,26 +100,23 @@
         const ctx = canvas.getContext('2d');
         const viewport = document.getElementById('viewport');
         const audio = document.getElementById('audio');
-        
         const imgMask = new Image(); imgMask.src = 'drop-color.png'; 
         const imgAlpha = new Image(); imgAlpha.src = 'drop-alpha.png'; 
         const bgImg = new Image();
-
         let drops = [];
         const sprite = 5;
 
-        function toggleElement(id, e) {
+        function toggleRules(e) {
             e.stopPropagation();
-            const el = document.getElementById(id);
-            el.style.display = (el.style.display === 'grid' || el.style.display === 'block') ? 'none' : (id === 'navGrid' ? 'grid' : 'block');
+            const card = document.getElementById('mainRule');
+            const btn = e.target;
+            const isOpen = card.style.display === 'block';
+            card.style.display = isOpen ? 'none' : 'block';
+            btn.innerText = isOpen ? '📜 OPEN RULES' : '✨ CLOSE RULES';
         }
 
         function handleSceneChange(select) {
             const [img, size] = select.value.split('|');
-            setScene(img, size);
-        }
-
-        function setScene(img, size) {
             viewport.style.backgroundImage = `url('${img}')`;
             viewport.style.backgroundSize = size;
             bgImg.src = img;
@@ -115,19 +130,21 @@
 
         function initRain() {
             drops = [];
-            // 默认大雨滴配置
-            for (let i = 0; i < 60; i++) {
-                const isDynamic = Math.random() > 0.7;
+            const density = document.getElementById('den').value;
+            for (let i = 0; i < density; i++) {
+                const isLarge = Math.random() > 0.8; 
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
                     si: Math.floor(Math.random() * sprite),
                     sj: Math.floor(Math.random() * sprite),
-                    s: isDynamic ? (Math.random() * 0.15 + 0.18) : (Math.random() * 0.05 + 0.08), 
-                    v: 0, 
-                    isDynamic: isDynamic,
-                    wait: Math.random() * 200, 
-                    friction: Math.random() * 0.05 + 0.93
+                    // 大小极大化：大滴 0.25-0.5, 小滴 0.05-0.12
+                    s: isLarge ? (Math.random() * 0.25 + 0.25) : (Math.random() * 0.07 + 0.05),
+                    v: 0,
+                    isLarge: isLarge,
+                    wait: Math.random() * 300,
+                    friction: Math.random() * 0.05 + 0.92,
+                    swing: 0 
                 });
             }
         }
@@ -140,51 +157,59 @@
                 const sw = imgMask.width / sprite;
                 const sh = imgMask.height / sprite;
                 const dw = sw * d.s;
-                const dh = dw * (d.isDynamic ? 1.8 : 1.4);
+                const dh = dw * (d.isLarge ? 1.6 : 1.3);
 
                 ctx.save();
-                ctx.translate(d.x, d.y);
+                // 增加摆动逻辑
+                const currentX = d.x + Math.sin(d.swing) * (d.isLarge ? 2 : 0);
+                ctx.translate(currentX, d.y);
+                
                 ctx.beginPath();
                 ctx.moveTo(dw/2, 0);
                 ctx.bezierCurveTo(dw, dh*0.3, dw, dh, dw/2, dh);
                 ctx.bezierCurveTo(0, dh, 0, dh*0.3, dw/2, 0);
-                ctx.closePath();
                 ctx.clip(); 
 
                 if (bgImg.complete) {
-                    ctx.drawImage(bgImg, d.x, d.y, dw*0.5, dh*0.5, -dw/2, -dh/2, dw*2, dh*2);
+                    // 折射放大倍率根据大小调整
+                    const refract = d.isLarge ? 0.4 : 0.7;
+                    ctx.drawImage(bgImg, currentX, d.y, dw*refract, dh*refract, -dw/2, -dh/2, dw*2, dh*2);
                 }
 
-                ctx.globalAlpha = d.isDynamic ? 0.7 : 0.4;
+                ctx.globalAlpha = d.isLarge ? 0.8 : 0.4;
                 ctx.globalCompositeOperation = 'screen';
                 ctx.drawImage(imgAlpha, d.si*sw, d.sj*sh, sw, sh, 0, 0, dw, dh);
                 ctx.globalCompositeOperation = 'multiply';
                 ctx.drawImage(imgMask, d.si*sw, d.sj*sh, sw, sh, 0, 0, dw, dh);
                 ctx.restore();
 
-                if (d.isDynamic) {
+                // 物理下落逻辑
+                if (d.isLarge || d.s > 0.1) {
                     d.wait--;
                     if (d.wait < 0) {
-                        d.v += 0.15; d.v *= d.friction; d.y += d.v;
-                        if (Math.random() > 0.98) { d.v *= 0.1; d.wait = Math.random()*60; }
+                        d.v += 0.2; 
+                        d.v *= d.friction;
+                        d.y += d.v;
+                        d.swing += 0.1;
+                        if (Math.random() > 0.98) { d.v *= 0.1; d.wait = Math.random()*80; }
                     }
                 }
                 if (d.y > canvas.height) {
-                    d.y = -dh; d.x = Math.random()*canvas.width; d.v = 0; d.wait = Math.random()*300;
+                    d.y = -dh; d.x = Math.random()*canvas.width; d.v = 0; d.wait = Math.random()*400;
                 }
             });
             requestAnimationFrame(draw);
         }
 
         function sync() { audio.volume = document.getElementById('vol').value; }
-        function initAudio() { if(audio.paused) { audio.play(); pbtn.innerText = "STOP"; } }
-        function toggleAudio(e) { e.stopPropagation(); audio.paused ? audio.play() : audio.pause(); pbtn.innerText = audio.paused ? "PLAY" : "STOP"; }
+        function initAudio() { if(audio.paused) { audio.play(); pbtn.innerText = "⏸"; } }
+        function toggleAudio(e) { e.stopPropagation(); audio.paused ? audio.play() : audio.pause(); pbtn.innerText = audio.paused ? "▶" : "⏸"; }
         function updateClock() {
             const now = new Date();
             document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour12: false});
         }
         window.onload = () => {
-            setScene('pensive.png', 'contain');
+            handleSceneChange({value: 'pensive.png|contain'});
             resize(); draw(); setInterval(updateClock, 1000); updateClock();
         };
         window.addEventListener('resize', resize);
