@@ -62,12 +62,12 @@
             <option value="sunny">☀️ 晴朗</option>
         </select>
 
-        <select id="sceneSelect" onchange="changeScene()">
-            <option value="pensive.png">🏺 冥想盆</option>
-            <option value="train.png">🚂 霍格沃茨</option>
-            <option value="window.png">🪟 落地窗</option>
-            <option value="beach.png">🏖️ 贝壳小屋</option>
-            <option value="mountain.png">🏔️ 雪山</option>
+        <select id="sceneSelect" onchange="changeScene(this.value)">
+        <option value="pensive.png">🏺 冥想盆</option>
+        <option value="train.png">🚂 霍格沃茨</option>
+        <option value="window.png">🪟 落地窗</option>
+        <option value="beach.png">🏖️ 贝壳小屋</option>
+        <option value="mountain.png">🏔️ 雪山</option>
         </select>
         
         <button id="pbtn" onclick="toggleAudio(event)">▶</button>
@@ -81,14 +81,9 @@
         const pbtn = document.getElementById('pbtn');
 
         // 切换背景场景
-        function changeScene() {
-    const sceneUrl = document.getElementById('sceneSelect').value;
-    if(window.rainEngine) {
-        const img = new Image();
-        img.onload = function() {
-            window.rainEngine.updateBackground(img);
-        };
-        img.src = sceneUrl;
+        function changeScene(sceneUrl) {
+    if(window.changeScene) {
+        window.changeScene(sceneUrl);
     }
 }
 
