@@ -3,75 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova's Pensieve 2.0</title>
+    <title>Nova's Pensieve Room</title>
     <style>
-        :root { --glass: rgba(0, 0, 0, 0.6); --border: rgba(255, 255, 255, 0.2); }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "PingFang SC", "Hiragino Sans GB", serif; }
+        :root { --glass: rgba(0, 0, 0, 0.7); --border: rgba(255, 255, 255, 0.15); --gold: #d4af37; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: serif; }
 
+        /* 背景：清晰无损 */
         #main-stage {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url("pensive.png") center center no-repeat;
             background-size: cover; z-index: 1;
+            transition: background-image 1.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 雨滴：一颗颗透明滚落感 */
-        .rain {
+        /* --- 核心：水滴物理引擎层 --- */
+        #rain-viewport {
+            position: absolute; width: 100%; height: 100%;
+            z-index: 3;
+            /* 粘滞滤镜：通过极高对比度，把模糊的亮点聚合成球状水珠 */
+            filter: contrast(30) brightness(1.6);
+            pointer-events: none;
+        }
+
+        .drop-layer {
             position: absolute; top: -100%; left: 0; width: 100%; height: 200%;
             background: url("stardust.png") repeat;
-            pointer-events: none; z-index: 3;
-            mix-blend-mode: screen;
-            filter: contrast(120%) brightness(1.2) drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
+            /* 初始模糊决定了水珠的大小：模糊越大，聚合出的水滴越肥大 */
+            filter: blur(8px); 
+            animation: gravity-fall 5s linear infinite;
         }
-        #rain-1 { background-size: 350px; animation: fall 4s linear infinite; opacity: 0.6; }
 
-        @keyframes fall { from { transform: translateY(-50%); } to { transform: translateY(0%); } }
+        /* 模拟重力：稍微快一点的掉落 */
+        @keyframes gravity-fall {
+            from { transform: translateY(-40%); }
+            to { transform: translateY(10%); }
+        }
 
-        /* 侧边导航 */
+        /* 侧边导航栏 (左侧) */
         .side-nav {
-            position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
-            display: flex; flex-direction: column; gap: 15px; z-index: 10;
+            position: absolute; left: 25px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 18px; z-index: 10;
         }
         .nav-card {
             background: var(--glass); border: 1px solid var(--border);
-            padding: 15px; border-radius: 12px; text-decoration: none; color: #ccc;
-            backdrop-filter: blur(10px); transition: 0.3s; width: 80px; text-align: center; font-size: 13px;
+            padding: 16px 10px; border-radius: 14px; text-decoration: none; color: #999;
+            backdrop-filter: blur(12px); transition: 0.4s; width: 70px; text-align: center; font-size: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
         }
-        .nav-card:hover { color: white; border-color: #fff; transform: translateX(5px); }
+        .nav-card:hover { color: #fff; border-color: var(--gold); transform: scale(1.05) translateX(5px); }
 
-        /* 中央纪律卡片 */
-        .center-box {
-            position: absolute; top: 50%; left: 55%; transform: translate(-50%, -50%);
-            width: 90%; max-width: 500px; z-index: 10; text-align: center;
+        /* 中央纪律卡片 (折叠感) */
+        .discipline-center {
+            position: absolute; top: 45%; left: 55%; transform: translate(-50%, -50%);
+            width: 85%; max-width: 480px; z-index: 10;
         }
         details {
-            background: rgba(15, 20, 30, 0.8); border: 1px solid #d4af37; /* 黄金边框 */
-            padding: 20px; border-radius: 15px; backdrop-filter: blur(15px);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            background: rgba(10, 15, 25, 0.85); border: 1px solid var(--gold);
+            padding: 25px; border-radius: 20px; backdrop-filter: blur(20px);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
         }
         summary {
-            font-size: 1.2rem; letter-spacing: 5px; cursor: pointer; color: #d4af37;
-            list-style: none; outline: none; font-weight: bold;
+            font-size: 1.1rem; letter-spacing: 6px; cursor: pointer; color: var(--gold);
+            list-style: none; text-align: center; font-weight: 200;
         }
-        summary::-webkit-details-marker { display: none; }
-        .rule-content {
-            margin-top: 20px; text-align: left; line-height: 1.8; color: #ddd;
-            font-size: 0.95rem; border-top: 1px solid var(--border); padding-top: 15px;
+        .rules {
+            margin-top: 25px; text-align: left; line-height: 2; color: #bbb;
+            font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 20px;
         }
-        .rule-content b { color: #fff; border-bottom: 1px solid #555; }
+        .rules b { color: #fff; font-weight: 400; }
 
-        /* 控制台 */
-        .bottom-ctrl {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: var(--glass); padding: 15px 30px; border-radius: 40px;
-            display: flex; gap: 20px; align-items: center; z-index: 10; border: 1px solid var(--border);
+        /* 底部控制台 */
+        .bottom-bar {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            background: var(--glass); padding: 12px 35px; border-radius: 50px;
+            display: flex; gap: 25px; align-items: center; z-index: 10; border: 1px solid var(--border);
         }
-        input[type=range] { accent-color: #d4af37; width: 80px; }
+        input[type=range] { accent-color: var(--gold); width: 100px; cursor: pointer; }
+        .play-btn { background: none; border: 1px solid #fff; color: #fff; border-radius: 20px; padding: 6px 20px; cursor: pointer; font-size: 12px; transition: 0.3s; }
+        .play-btn:hover { background: #fff; color: #000; }
     </style>
 </head>
 <body onclick="autoPlay()">
 
     <div id="main-stage">
-        <div id="rain-1" class="rain"></div>
+        <div id="rain-viewport">
+            <div id="rain-drops" class="drop-layer"></div>
+        </div>
     </div>
 
     <div class="side-nav">
@@ -81,37 +98,42 @@
         <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-card">🔮<br>看板</a>
     </div>
 
-    <div class="center-box">
+    <div class="discipline-center">
         <details open>
-            <summary>✧ NOVA'S TRADING DISCIPLINE ✧</summary>
-            <div class="rule-content">
-                1. <b>情绪拦截</b>：若产生“急于回本”或“踏空恐惧”，立即关闭古灵阁，看雨滴 5 分钟。<br>
-                2. <b>信号至上</b>：看板未见“🚀 强势脉冲”或“🧱 锁仓”，绝不盲目手动开仓。<br>
-                3. <b>保护主义</b>：古灵阁冷却保护（Cooldown）触发时，严禁劫持系统强制买入。<br>
-                4. <b>坑位确认</b>：黄金坑必须配合 9 秒盘口稳定审计，无确认，不压仓。<br>
-                5. <b>叙事审计</b>：不听股吧呐喊，只看 REPORT 里的派系金额，数据不撒谎。
+            <summary>✧ THE DISCIPLINE ✧</summary>
+            <div class="rules">
+                1. <b>情绪拦截</b>：产生焦虑或踏空感时，强制观察水滴 5 分钟。<br>
+                2. <b>信号确认</b>：看板未现“强力突破”或“黄金坑”，绝不动手。<br>
+                3. <b>保护机制</b>：古灵阁冷却期间，严禁任何形式的劫持交易。<br>
+                4. <b>穿透审计</b>：忽视股吧噪音，只看 REPORT 里的资金真实血统。<br>
+                5. <b>分批压仓</b>：按古灵阁建议规模执行，不孤注一掷。
             </div>
         </details>
     </div>
 
-    <div class="bottom-ctrl">
+    <div class="bottom-bar">
         <span>🔊 <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()"></span>
-        <span>🌧️ <input type="range" id="rain-size" min="100" max="600" step="10" value="350" oninput="sync()"></span>
-        <button id="pbtn" onclick="toggle(event)" style="background:none; border:1px solid #fff; color:#fff; border-radius:15px; padding:5px 15px; cursor:pointer;">PLAY</button>
+        <span>🌧️ <input type="range" id="rain-size" min="100" max="1000" step="10" value="400" oninput="sync()"></span>
+        <button id="pbtn" class="play-btn" onclick="toggle(event)">PLAY</button>
     </div>
 
     <audio id="audio" loop src="0.m4a"></audio>
 
     <script>
         const audio = document.getElementById('audio');
-        const r1 = document.getElementById('rain-1');
+        const drops = document.getElementById('rain-drops');
         const pbtn = document.getElementById('pbtn');
 
         function sync() {
             audio.volume = document.getElementById('vol').value;
             const size = document.getElementById('rain-size').value;
-            r1.style.backgroundSize = size + "px";
-            r1.style.opacity = (size / 600) * 0.7;
+            
+            // 物理缩放：调节背景大小
+            drops.style.backgroundSize = size + "px";
+            
+            // 物理融合：Bar 越大，模糊越高，聚合出的水滴就越饱满、越大颗
+            const blurPower = (size / 100) * 2;
+            drops.style.filter = `blur(${blurPower}px)`;
         }
 
         function toggle(e) {
