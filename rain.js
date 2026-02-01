@@ -29,7 +29,8 @@
         this.drops = [];
         this.canvas = createCanvas(width * scale, height * scale);
         this.ctx = this.canvas.getContext('2d');
-        this.options = { minR: 15, maxR: 45, rainChance: 0.6, collisionRadius: 0.45 };
+        // 稍微调高 rainChance，确保能看到雨滴
+        this.options = { minR: 20, maxR: 50, rainChance: 0.75, collisionRadius: 0.45 };
     }
 
     Raindrops.prototype.update = function(delta) {
@@ -38,7 +39,7 @@
                 x: Math.random() * this.width,
                 y: -100,
                 r: Math.random() * (this.options.maxR - this.options.minR) + this.options.minR,
-                v: Math.random() * 5 + 3
+                v: Math.random() * 6 + 4
             });
         }
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -46,12 +47,14 @@
             var d = this.drops[i];
             d.y += d.v * delta;
             var size = d.r * 2 * this.scale;
+            
             this.ctx.globalAlpha = 1.0;
             this.ctx.globalCompositeOperation = 'source-over';
             this.ctx.drawImage(this.dropAlpha, (d.x - d.r) * this.scale, (d.y - d.r) * this.scale, size, size);
             this.ctx.globalCompositeOperation = 'source-in';
             this.ctx.drawImage(this.dropColor, (d.x - d.r) * this.scale, (d.y - d.r) * this.scale, size, size);
             this.ctx.globalCompositeOperation = 'source-over';
+            
             if (d.y > this.height + 100) this.drops.splice(i, 1);
         }
     };
@@ -72,8 +75,8 @@
     RainRenderer.prototype.init = function() {
         var gl = this.gl;
         var vs = 'attribute vec2 p;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=p*0.5+0.5;v.y=1.0-v.y;}';
-        // 关键点：增加了高光反射强度 r.b * 0.45，让雨滴在暗处显现
-        var fs = 'precision mediump float;varying vec2 v;uniform sampler2D b,w;void main(){vec4 r=texture2D(w,v);vec2 o=(r.rg-0.5)*0.35;if(r.a>0.01){gl_FragColor=texture2D(b,v+o)+r.b*0.45;}else{gl_FragColor=texture2D(b,v);}}';
+        // 关键强化：r.b * 0.65 显著提升了雨滴在暗色（冥想盆）背景下的反光感
+        var fs = 'precision mediump float;varying vec2 v;uniform sampler2D b,w;void main(){vec4 r=texture2D(w,v);vec2 o=(r.rg-0.5)*0.35;if(r.a>0.005){gl_FragColor=texture2D(b,v+o)+r.b*0.65;}else{gl_FragColor=texture2D(b,v);}}';
         
         var prog = gl.createProgram();
         [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER].forEach(function(type, i){
@@ -143,21 +146,22 @@
             img.onload = function() { renderer.updateBackground(img); };
             img.src = sceneUrl;
 
-            // 音频联动
+            // 双音轨逻辑核心：
             var a_scene = document.getElementById('audio_scene');
             var a_bg = document.getElementById('audio_bg');
             
-            // 确保背景音常驻
-            if(a_bg && a_bg.paused) a_bg.play();
+            // 确保背景雨声 0.m4a 永不停歇
+            if(a_bg && a_bg.paused) a_bg.play().catch(e => {});
 
             if (a_scene) {
-                var audioUrl = sceneUrl.split('.')[0] + '.m4a';
-                // 如果是冥想盆场景，停掉场景音，只留背景
+                // 如果是切换回冥想盆，则停掉场景音
                 if(sceneUrl === 'pensive.png') {
                     a_scene.pause();
                 } else {
+                    // train.png -> train.m4a
+                    var audioUrl = sceneUrl.split('.')[0] + '.m4a';
                     a_scene.src = audioUrl;
-                    a_scene.play().catch(e => console.log("交互限制，点击后播放"));
+                    a_scene.play().catch(e => console.log("等待点击页面激活声音"));
                 }
             }
         };
