@@ -153,9 +153,8 @@
             // 绘制为梭形：宽度变窄，长度拉伸 2.5 倍
             this.dropCtx.drawImage(
                 this.dropImg, 
-                d.x - d.r * 0.4, d.y - d.r, 
-                d.r * 0.8, d.r * 2.5
-            );
+                d.x - d.r * 0.6, d.y - d.r, 
+                d.r * 1.2, d.r * 2.2 // 稍微变胖一点，显形更明显
 
             if (d.y > this.dropCanvas.height + 100) this.drops.splice(i, 1);
         }
