@@ -16,15 +16,19 @@
         canvas.width = canvas.height = size;
         const ctx = canvas.getContext('2d');
         const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-        // R: X偏移, G: Y偏移, B: 亮度, A: 混合度
-        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        grad.addColorStop(0.5, 'rgba(128, 128, 255, 0.5)');
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        // 核心修正：
+        // R: 128 (中值), G: 128 (中值) -> 这样背景不会被推得太远
+        // B: 255 (最高亮度) -> 增加雨滴的高光效果
+        // A: 1.0 -> 保证 alpha 足够厚
+        grad.addColorStop(0, 'rgba(128, 128, 255, 1.0)'); 
+        grad.addColorStop(0.5, 'rgba(128, 128, 180, 0.5)'); 
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); 
+        
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, size, size);
         return canvas;
     }
-
     function RainRenderer(container) {
         this.container = container;
         this.canvas = document.createElement('canvas');
