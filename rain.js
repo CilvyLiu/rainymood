@@ -17,12 +17,9 @@
         const ctx = canvas.getContext('2d');
         const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
         
-        // 核心修正：
-        // R: 128 (中值), G: 128 (中值) -> 这样背景不会被推得太远
-        // B: 255 (最高亮度) -> 增加雨滴的高光效果
-        // A: 1.0 -> 保证 alpha 足够厚
-        grad.addColorStop(0, 'rgba(128, 128, 255, 1.0)'); 
-        grad.addColorStop(0.5, 'rgba(128, 128, 180, 0.5)'); 
+        // 重点：R/G 决定偏移，B 决定高光，Alpha 决定存在感
+        grad.addColorStop(0, 'rgba(128, 128, 255, 1.0)'); // 中心
+        grad.addColorStop(0.5, 'rgba(128, 128, 180, 0.6)'); 
         grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); 
         
         ctx.fillStyle = grad;
@@ -130,31 +127,32 @@
     };
 
    RainRenderer.prototype.loop = function() {
-        // 1. 生成新雨滴：确保读取最新的 options
+        // 1. 生成新雨滴
         if (Math.random() < this.options.rainChance) {
             this.drops.push({
                 x: Math.random() * this.dropCanvas.width,
                 y: -100,
-                // 实时计算半径和速度
+                // 确保半径受 ratio 保护，不至于太小
                 r: (Math.random() * (this.options.maxR - this.options.minR) + this.options.minR) * this.ratio,
-                v: ((this.options.baseSpeed || 4) + Math.random() * 2) * this.ratio
+                // 显著提升下落速度感
+                v: ((this.options.baseSpeed || 4) + Math.random() * 5) * this.ratio 
             });
         }
 
-        // 2. 离屏绘制：拖尾水痕
-        this.dropCtx.fillStyle = 'rgba(0, 0, 0, 0.18)'; 
+        // 2. 离屏绘制
+        this.dropCtx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // 稍微加深底色，增加拖尾厚度
         this.dropCtx.fillRect(0, 0, this.dropCanvas.width, this.dropCanvas.height);
 
-        this.dropCtx.globalAlpha = 0.7; 
+        this.dropCtx.globalAlpha = 0.8; 
         for (let i = this.drops.length - 1; i >= 0; i--) {
             let d = this.drops[i];
             d.y += d.v; 
             
-            // --- 修复位置：补齐了闭括号 ) 并微调了梭形比例 ---
+            // 关键：增加绘制的宽度比 (0.8) 和 长度比 (3.0)，让它从“细线”变“梭形”
             this.dropCtx.drawImage(
                 this.dropImg, 
-                d.x - d.r * 0.6, d.y - d.r, 
-                d.r * 1.2, d.r * 2.2
+                d.x - d.r * 0.8, d.y - d.r, 
+                d.r * 1.6, d.r * 3.5 
             ); 
 
             if (d.y > this.dropCanvas.height + 100) {
@@ -178,16 +176,15 @@
         gl.uniform1i(loc("u_bg"), 0);
         gl.uniform1i(loc("u_water"), 1);
 
-        // --- 参数调优：显形的关键 ---
-        gl.uniform1f(loc("u_br"), 1.1);        // 略微调高亮度
-        gl.uniform1f(loc("u_aMult"), 18.0);    // 极高对比度，让雨滴边缘锐利
-        gl.uniform1f(loc("u_aSub"), 0.25);     // 再次调低扣除值，确保小雨滴也能看见
-        gl.uniform1f(loc("u_ref"), 0.4);       // 适度折射
+        // --- 核心调优：解决“细线”和“隐形” ---
+        gl.uniform1f(loc("u_br"), 1.2);        // 增加亮度，让雨滴更晶莹
+        gl.uniform1f(loc("u_aMult"), 20.0);    // 极大对比度
+        gl.uniform1f(loc("u_aSub"), 0.15);     // 极低扣除：确保即使是细雨也能显形
+        gl.uniform1f(loc("u_ref"), 0.5);       // 增强折射效果
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         requestAnimationFrame(this.loop.bind(this));
     };
-
     window.addEventListener('load', () => {
         const container = document.getElementById('container');
         if(!container) return;
