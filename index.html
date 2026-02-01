@@ -2,56 +2,54 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Nova's Pensieve - Ultimate Physics</title>
+    <title>Nova's Pensieve - Physical Realism</title>
     <style>
         :root { 
-            --glass: rgba(255, 255, 255, 0.05); 
-            --blur: blur(20px); 
-            --border: rgba(255, 255, 255, 0.1); 
+            --glass: rgba(255, 255, 255, 0.03); 
+            --blur: blur(25px); 
+            --border: rgba(255, 255, 255, 0.08); 
         }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "PingFang SC", sans-serif; }
         
-        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: 1s; filter: blur(8px) brightness(0.6); }
+        /* 背景保持模糊，雨滴内部保持清晰 */
+        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: 1.5s; filter: blur(10px) brightness(0.5); }
         #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.4) 100%); z-index: 2; pointer-events: none; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 20%, rgba(0,0,0,0.5) 100%); z-index: 2; pointer-events: none; }
 
-        /* 左侧导航 */
-        .side-nav { position: fixed; left: 30px; top: 50%; transform: translateY(-50%); z-index: 100; display: flex; flex-direction: column; gap: 15px; }
+        .side-nav { position: fixed; left: 25px; top: 50%; transform: translateY(-50%); z-index: 100; display: flex; flex-direction: column; gap: 15px; }
         .nav-item { 
-            width: 50px; height: 50px; background: var(--glass); backdrop-filter: var(--blur); 
-            border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; 
-            justify-content: center; text-decoration: none; font-size: 20px; transition: 0.3s;
+            width: 45px; height: 45px; background: var(--glass); backdrop-filter: var(--blur); 
+            border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; 
+            justify-content: center; text-decoration: none; font-size: 18px; transition: 0.4s;
         }
-        .nav-item:hover { background: rgba(255,255,255,0.1); transform: scale(1.1); border-color: #fff; }
+        .nav-item:hover { background: rgba(255,255,255,0.1); transform: translateX(5px); border-color: #fff; }
 
-        /* 正中间纪律 */
-        .center-container { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; width: 400px; }
+        .center-container { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; width: 500px; }
         .rule-card { 
-            background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(25px); 
-            border: 1px solid var(--border); border-radius: 20px; padding: 30px;
-            display: none; transition: 0.5s; margin-bottom: 20px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            background: rgba(10, 10, 10, 0.4); backdrop-filter: blur(40px); 
+            border: 1px solid var(--border); border-radius: 24px; padding: 40px;
+            display: none; transition: 0.5s ease-in-out; margin-bottom: 25px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
         }
-        .rule-card h2 { letter-spacing: 5px; font-weight: 300; margin-bottom: 20px; color: #fff; }
-        .rule-card p { font-size: 14px; line-height: 2.2; color: #ccc; text-align: left; }
+        .rule-card h2 { letter-spacing: 8px; font-weight: 200; margin-bottom: 25px; color: #fff; opacity: 0.9; }
+        .rule-card p { font-size: 15px; line-height: 2.5; color: #bbb; text-align: justify; }
 
-        /* 底部控制栏 */
         .bottom-bar { 
-            position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 100;
-            display: flex; align-items: center; gap: 20px; background: var(--glass);
-            backdrop-filter: var(--blur); padding: 12px 30px; border-radius: 50px; border: 1px solid var(--border);
+            position: fixed; bottom: 35px; left: 50%; transform: translateX(-50%); z-index: 100;
+            display: flex; align-items: center; gap: 20px; background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(20px); padding: 10px 30px; border-radius: 50px; border: 1px solid var(--border);
         }
 
         button.magic-btn { 
-            background: transparent; border: 1px solid #fff; color: #fff; 
-            padding: 8px 25px; border-radius: 20px; cursor: pointer; font-size: 12px;
-            letter-spacing: 2px; transition: 0.3s;
+            background: transparent; border: 1px solid rgba(255,255,255,0.4); color: #fff; 
+            padding: 10px 35px; border-radius: 30px; cursor: pointer; font-size: 11px;
+            letter-spacing: 3px; transition: 0.3s;
         }
-        button.magic-btn:hover { background: #fff; color: #000; }
+        button.magic-btn:hover { background: #fff; color: #000; border-color: #fff; }
 
-        select { background: transparent; color: #fff; border: 1px solid var(--border); padding: 5px 10px; border-radius: 10px; font-size: 12px; outline: none; }
-        input[type=range] { accent-color: #fff; cursor: pointer; vertical-align: middle; width: 80px; }
-        label { font-size: 11px; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; }
+        select { background: transparent; color: #fff; border: none; padding: 5px; cursor: pointer; font-size: 12px; outline: none; }
+        input[type=range] { accent-color: #fff; width: 70px; height: 3px; }
+        label { font-size: 9px; opacity: 0.5; letter-spacing: 1px; }
     </style>
 </head>
 <body onclick="initAudio()">
@@ -61,36 +59,36 @@
     <canvas id="rainCanvas"></canvas>
 
     <div class="side-nav">
-        <a href="https://gringott.streamlit.app/" target="_blank" class="nav-item" title="古灵阁">🏦</a>
-        <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-item" title="嗅嗅探测">🐾</a>
-        <a href="https://newscil.streamlit.app/" target="_blank" class="nav-item" title="预言日报">📜</a>
-        <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-item" title="战略看板">🔮</a>
+        <a href="https://gringott.streamlit.app/" target="_blank" class="nav-item">🏦</a>
+        <a href="https://wwskygazer.streamlit.app/" target="_blank" class="nav-item">🐾</a>
+        <a href="https://newscil.streamlit.app/" target="_blank" class="nav-item">📜</a>
+        <a href="https://skygazer111.streamlit.app/" target="_blank" class="nav-item">🔮</a>
     </div>
 
     <div class="center-container">
         <div class="rule-card" id="mainRule">
             <h2>看板纪律</h2>
             <p>
-                1. <b>深潜</b>：进入冥想盆，剥离情绪干扰。<br>
-                2. <b>精准</b>：每一行数据背后都是真实的逻辑。<br>
-                3. <b>韧性</b>：在波动的雨幕中寻找恒定的趋势。<br>
-                4. <b>进化</b>：复盘是通往大师之路的唯一阶梯。
+                <b>壹 · 深潜</b>：入冥想盆，如水滴融入深潭，剥离万千杂念。<br>
+                <b>贰 · 精准</b>：逻辑如冰晶碎裂，每一行数据皆有因果。<br>
+                <b>叁 · 韧性</b>：纵使雨幕遮眼，亦要在波动中攫取永恒之趋势。<br>
+                <b>肆 · 进化</b>：日拱一卒，复盘为魂，以此身炼就破局之法。
             </p>
         </div>
-        <button class="magic-btn" onclick="toggleRules(event)">📜 OPEN RULES</button>
+        <button class="magic-btn" onclick="toggleRules(event)">FOCUS MODE</button>
     </div>
 
     <div class="bottom-bar">
-        <div id="clock" style="font-size: 14px; letter-spacing: 1px; margin-right: 15px; font-weight: 200;"></div>
-        <label>VOL</label> <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()">
-        <label>RAIN</label> <input type="range" id="den" min="10" max="200" value="80" oninput="initRain()">
+        <div id="clock" style="font-size: 13px; letter-spacing: 2px; font-weight: 200; min-width: 80px;"></div>
+        <label>VOLUME</label> <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()">
+        <label>STORM</label> <input type="range" id="den" min="20" max="300" value="100" oninput="initRain()">
         <select onchange="handleSceneChange(this)">
             <option value="pensive.png|contain">🏺 冥想盆</option>
-            <option value="train.png|cover">🚂 霍格沃茨特快</option>
-            <option value="window.png|cover">🪟 落地窗前</option>
+            <option value="train.png|cover">🚂 霍格沃茨</option>
+            <option value="window.png|cover">🪟 落地窗</option>
             <option value="beach.png|cover">🏖️ 贝壳小屋</option>
         </select>
-        <button id="pbtn" onclick="toggleAudio(event)" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">▶</button>
+        <button id="pbtn" onclick="toggleAudio(event)" style="background: none; border: none; color: white; cursor: pointer; font-size: 14px; opacity: 0.7;">▶</button>
     </div>
 
     <audio id="audio" loop src="0.m4a"></audio>
@@ -109,10 +107,9 @@
         function toggleRules(e) {
             e.stopPropagation();
             const card = document.getElementById('mainRule');
-            const btn = e.target;
             const isOpen = card.style.display === 'block';
             card.style.display = isOpen ? 'none' : 'block';
-            btn.innerText = isOpen ? '📜 OPEN RULES' : '✨ CLOSE RULES';
+            e.target.innerText = isOpen ? 'FOCUS MODE' : 'RELEASE';
         }
 
         function handleSceneChange(select) {
@@ -132,19 +129,19 @@
             drops = [];
             const density = document.getElementById('den').value;
             for (let i = 0; i < density; i++) {
-                const isLarge = Math.random() > 0.8; 
+                const isHeavy = Math.random() > 0.85;
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
                     si: Math.floor(Math.random() * sprite),
                     sj: Math.floor(Math.random() * sprite),
-                    // 大小极大化：大滴 0.25-0.5, 小滴 0.05-0.12
-                    s: isLarge ? (Math.random() * 0.25 + 0.25) : (Math.random() * 0.07 + 0.05),
+                    // 尺寸进一步放大，大滴 0.3-0.6
+                    s: isHeavy ? (Math.random() * 0.3 + 0.3) : (Math.random() * 0.1 + 0.05),
                     v: 0,
-                    isLarge: isLarge,
-                    wait: Math.random() * 300,
-                    friction: Math.random() * 0.05 + 0.92,
-                    swing: 0 
+                    isHeavy: isHeavy,
+                    tension: Math.random() * 0.2 + 0.8, // 表面张力系数
+                    lastY: 0,
+                    trail: []
                 });
             }
         }
@@ -153,49 +150,58 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (!imgMask.complete || !imgAlpha.complete) { requestAnimationFrame(draw); return; }
 
+            // 深度排序：确保大滴覆盖小滴
             drops.sort((a,b) => a.s - b.s).forEach(d => {
                 const sw = imgMask.width / sprite;
                 const sh = imgMask.height / sprite;
                 const dw = sw * d.s;
-                const dh = dw * (d.isLarge ? 1.6 : 1.3);
+                const dh = dw * (d.isHeavy ? 1.5 : 1.2);
 
                 ctx.save();
-                // 增加摆动逻辑
-                const currentX = d.x + Math.sin(d.swing) * (d.isLarge ? 2 : 0);
-                ctx.translate(currentX, d.y);
+                ctx.translate(d.x, d.y);
                 
+                // 物理裁剪
                 ctx.beginPath();
                 ctx.moveTo(dw/2, 0);
                 ctx.bezierCurveTo(dw, dh*0.3, dw, dh, dw/2, dh);
                 ctx.bezierCurveTo(0, dh, 0, dh*0.3, dw/2, 0);
                 ctx.clip(); 
 
+                // 核心：折射模拟
                 if (bgImg.complete) {
-                    // 折射放大倍率根据大小调整
-                    const refract = d.isLarge ? 0.4 : 0.7;
-                    ctx.drawImage(bgImg, currentX, d.y, dw*refract, dh*refract, -dw/2, -dh/2, dw*2, dh*2);
+                    // 凸透镜原理：内部画面反转并放大
+                    ctx.scale(1, -1); 
+                    ctx.drawImage(bgImg, d.x, d.y, dw*0.4, dh*0.4, -dw/2, -dh/2, dw, dh);
+                    ctx.scale(1, -1);
                 }
 
-                ctx.globalAlpha = d.isLarge ? 0.8 : 0.4;
+                // 质感叠加
+                ctx.globalAlpha = d.isHeavy ? 0.9 : 0.5;
                 ctx.globalCompositeOperation = 'screen';
                 ctx.drawImage(imgAlpha, d.si*sw, d.sj*sh, sw, sh, 0, 0, dw, dh);
                 ctx.globalCompositeOperation = 'multiply';
                 ctx.drawImage(imgMask, d.si*sw, d.sj*sh, sw, sh, 0, 0, dw, dh);
                 ctx.restore();
 
-                // 物理下落逻辑
-                if (d.isLarge || d.s > 0.1) {
-                    d.wait--;
-                    if (d.wait < 0) {
-                        d.v += 0.2; 
-                        d.v *= d.friction;
-                        d.y += d.v;
-                        d.swing += 0.1;
-                        if (Math.random() > 0.98) { d.v *= 0.1; d.wait = Math.random()*80; }
+                // 非线性物理引擎
+                if (d.isHeavy) {
+                    // 模拟表面张力：只有重力积累到一定程度才会向下滑动
+                    if (Math.random() > 0.96) d.v += 0.8; 
+                    d.v *= d.tension; 
+                    d.y += d.v;
+                    d.x += Math.sin(d.y/50) * 0.3; // 蛇形下滑
+
+                    // 遇到“阻力”瞬间减速
+                    if (Math.random() > 0.99) {
+                        d.v *= 0.05;
                     }
+                } else {
+                    // 小水滴缓慢蠕动
+                    d.y += 0.1;
                 }
+
                 if (d.y > canvas.height) {
-                    d.y = -dh; d.x = Math.random()*canvas.width; d.v = 0; d.wait = Math.random()*400;
+                    d.y = -dh; d.x = Math.random()*canvas.width; d.v = 0;
                 }
             });
             requestAnimationFrame(draw);
