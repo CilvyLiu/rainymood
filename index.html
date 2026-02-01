@@ -7,7 +7,7 @@
 </head>
 <body onclick="initAudio()">
 
-    <div id="container" style="width:100%; height:100%; position:fixed;"></div>
+    <div id="container"></div>
     <div id="overlay"></div>
 
     <div class="side-nav">
@@ -32,7 +32,8 @@
 
     <div class="bottom-bar">
         <div id="clock">00:00:00</div>
-        <label>VOLUME</label> <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()">
+        <label>VOLUME</label> 
+        <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()">
         
         <select id="weatherSelect" onchange="changeWeather()">
             <option value="rain">🌧️ 细雨</option>
@@ -58,35 +59,35 @@
         const audio = document.getElementById('audio');
         const pbtn = document.getElementById('pbtn');
 
-        // 切换场景（背景图）
         function changeScene() {
             const scene = document.getElementById('sceneSelect').value;
-            // 这里的逻辑需要根据你的 rain.js 暴露的接口调整
-            // 通常是更新 renderer 里的背景纹理
-            document.getElementById('container').style.backgroundImage = `url(${scene})`;
+            if(window.rainEngine) window.rainEngine.updateBackground(scene);
         }
 
-        // 切换天气模式（对应 rain.js 里的 Z 对象）
         function changeWeather() {
             const weather = document.getElementById('weatherSelect').value;
-            window.location.hash = weather; // 触发 rain.js 里的 hashchange 事件
+            if(window.rainEngine) {
+                const settings = {
+                    rain: { chance: 0.2, speed: 2 },
+                    storm: { chance: 0.6, speed: 5 },
+                    drizzle: { chance: 0.1, speed: 1.5 },
+                    sunny: { chance: 0, speed: 0 }
+                };
+                window.rainEngine.options.rainChance = settings[weather].chance;
+                window.rainEngine.drops.forEach(d => d.v = settings[weather].speed + Math.random());
+            }
         }
 
-        // 基础交互
         function toggleRules(e) {
             e.stopPropagation();
             const card = document.getElementById('mainRule');
-            const isOpen = card.style.display === 'block';
-            card.style.display = isOpen ? 'none' : 'block';
-            e.target.innerText = isOpen ? 'FOCUS MODE' : 'RELEASE';
+            const isHidden = getComputedStyle(card).display === 'none';
+            card.style.display = isHidden ? 'block' : 'none';
+            e.target.innerText = isHidden ? 'RELEASE' : 'FOCUS MODE';
         }
 
         function sync() { audio.volume = document.getElementById('vol').value; }
-        
-        function initAudio() { 
-            if(audio.paused) { audio.play(); pbtn.innerText = "⏸"; } 
-        }
-
+        function initAudio() { if(audio.paused) { audio.play(); pbtn.innerText = "⏸"; } }
         function toggleAudio(e) { 
             e.stopPropagation(); 
             audio.paused ? audio.play() : audio.pause(); 
@@ -97,7 +98,6 @@
             const now = new Date();
             document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour12: false});
         }
-
         setInterval(updateClock, 1000);
         updateClock();
     </script>
