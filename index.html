@@ -6,9 +6,9 @@
     <title>Nova's Pensieve - Ultra Refraction</title>
     <style>
         :root { --glass: rgba(0, 0, 0, 0.7); --border: rgba(255, 255, 255, 0.15); --gold: #d4af37; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: 'Abel', serif; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: serif; }
 
-        /* 背景层：作为折射源 */
+        /* 背景层：依然保留，用于提供模糊的底层视觉 */
         #main-stage {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-size: cover; background-position: center;
@@ -18,36 +18,17 @@
 
         #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
-        .side-nav {
-            position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
-            display: flex; flex-direction: column; gap: 15px; z-index: 10;
-        }
-        .nav-card {
-            background: var(--glass); border: 1px solid var(--border);
-            padding: 12px 8px; border-radius: 12px; text-decoration: none; color: #888;
-            backdrop-filter: blur(10px); transition: 0.3s; width: 60px; text-align: center; font-size: 11px;
-        }
+        .side-nav { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 10; }
+        .nav-card { background: var(--glass); border: 1px solid var(--border); padding: 12px 8px; border-radius: 12px; text-decoration: none; color: #888; backdrop-filter: blur(10px); transition: 0.3s; width: 60px; text-align: center; font-size: 11px; }
         .nav-card:hover { color: #fff; border-color: var(--gold); transform: translateX(5px); }
 
-        .discipline-center {
-            position: absolute; top: 45%; left: 55%; transform: translate(-50%, -50%);
-            width: 85%; max-width: 450px; z-index: 10;
-        }
-        details {
-            background: rgba(10, 15, 25, 0.9); border: 1px solid var(--gold);
-            padding: 25px; border-radius: 20px; backdrop-filter: blur(25px);
-            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
-        }
+        .discipline-center { position: absolute; top: 45%; left: 55%; transform: translate(-50%, -50%); width: 85%; max-width: 450px; z-index: 10; }
+        details { background: rgba(10, 15, 25, 0.9); border: 1px solid var(--gold); padding: 25px; border-radius: 20px; backdrop-filter: blur(25px); box-shadow: 0 30px 60px rgba(0,0,0,0.8); }
         summary { font-size: 1.1rem; letter-spacing: 5px; cursor: pointer; color: var(--gold); list-style: none; text-align: center; outline: none; }
-        .rules { margin-top: 20px; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; }
-        
-        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 2.2rem; margin: 15px 0; display: none; }
+        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 2rem; margin: 15px 0; display: none; text-shadow: 0 0 10px var(--gold); }
+        .rules { margin-top: 20px; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; line-height: 1.6; }
 
-        .bottom-bar {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: var(--glass); padding: 10px 30px; border-radius: 50px;
-            display: flex; gap: 20px; align-items: center; z-index: 10; border: 1px solid var(--border);
-        }
+        .bottom-bar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--glass); padding: 10px 30px; border-radius: 50px; display: flex; gap: 20px; align-items: center; z-index: 10; border: 1px solid var(--border); }
         .ctrl-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #999; }
         input[type=range] { accent-color: var(--gold); width: 80px; }
         .play-btn { background: none; border: 1px solid var(--gold); color: var(--gold); border-radius: 20px; padding: 5px 20px; cursor: pointer; font-size: 11px; }
@@ -70,10 +51,10 @@
             <summary>✧ DISCIPLINE ✧</summary>
             <div id="timer-box">05:00</div>
             <div class="rules" id="rule-content">
-                1. <b>情绪拦截</b>：产生焦虑时，启动拦截倒计时。<br>
+                1. <b>情绪拦截</b>：产生焦虑时，启动冷静倒计时。<br>
                 2. <b>信号确认</b>：看板未现强力突破，绝不动手。<br>
                 3. <b>保护机制</b>：古灵阁冷却期间，严禁劫持系统。<br>
-                <button class="play-btn" style="width:100%; margin-top:15px;" onclick="startIntercept(300)">启动 5 分钟冷静拦截</button>
+                <button class="play-btn" style="width:100%; margin-top:15px;" onclick="startIntercept(300)">启动冷静拦截</button>
             </div>
         </details>
     </div>
@@ -86,7 +67,7 @@
             </select>
         </div>
         <div class="ctrl-item">🔊 <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5" oninput="sync()"></div>
-        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="10" max="100" step="1" value="40" oninput="initRain()"></div>
+        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="20" max="100" step="1" value="40" oninput="initRain()"></div>
         <button id="pbtn" class="play-btn" onclick="toggle(event)">PLAY</button>
     </div>
 
@@ -97,7 +78,7 @@
         const ctx = canvas.getContext('2d');
         const audio = document.getElementById('audio');
         const stage = document.getElementById('main-stage');
-        const bgImg = new Image();
+        const bgImg = new Image(); // 核心：用于折射的像素源
 
         const dropAlpha = new Image();
         dropAlpha.src = 'https://rainyscope.com/img/drop-alpha.png';
@@ -108,9 +89,9 @@
         let timerInterval;
 
         function changeBG() {
-            const src = document.getElementById('bg-select').value;
-            bgImg.src = src;
-            stage.style.backgroundImage = `url(${src})`;
+            const val = document.getElementById('bg-select').value;
+            stage.style.backgroundImage = `url("${val}")`;
+            bgImg.src = val; // 更新折射源
         }
 
         function resize() {
@@ -127,15 +108,17 @@
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    s: Math.random() * 0.3 + 0.2, 
-                    v: Math.random() * 0.5 + 0.2, 
+                    s: Math.random() * 0.3 + 0.2, // 水滴大小
+                    v: Math.random() * 0.6 + 0.3, // 下落速度
                     a: Math.random() * 0.5 + 0.3  
                 });
             }
         }
 
+        // 核心逻辑：物理合成渲染
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
             drops.forEach(d => {
                 const w = dropAlpha.width * d.s;
                 const h = dropAlpha.height * d.s;
@@ -143,21 +126,20 @@
                 ctx.save();
                 ctx.translate(d.x, d.y);
                 
-                // 第一步：绘制 Alpha 通道作为“容器形状”
+                // 1. 先画形状 (遮罩层)
                 ctx.globalAlpha = d.a;
                 ctx.drawImage(dropAlpha, 0, 0, w, h);
 
-                // 第二步：使用 source-in 模式将背景图位移注入
+                // 2. 合成折射 (只在形状内画背景，并位移)
                 ctx.globalCompositeOperation = 'source-in';
                 ctx.save();
-                // 模拟折射：背景坐标偏移 (偏移 15 像素模拟凸透镜感)
-                ctx.translate(-d.x, -d.y + 15);
-                ctx.filter = 'brightness(1.1) blur(0.5px)';
+                ctx.translate(-d.x, -d.y + 15); // 关键：背景像素上移 15px
+                ctx.filter = 'brightness(1.2) contrast(1.1)'; // 水滴内亮一点
                 ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
                 ctx.restore();
 
-                // 第三步：叠加彩色光泽 (Color 层)
-                ctx.globalCompositeOperation = 'overlay';
+                // 3. 叠加光泽 (让水滴有边缘彩光)
+                ctx.globalCompositeOperation = 'screen';
                 ctx.globalAlpha = 0.4;
                 ctx.drawImage(dropColor, 0, 0, w, h);
 
@@ -181,26 +163,19 @@
                 const m = Math.floor(timeLeft / 60);
                 const s = timeLeft % 60;
                 box.innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-                if(timeLeft <= 0) {
+                if(timeLeft-- <= 0) {
                     clearInterval(timerInterval);
                     box.innerText = "ZEN";
                 }
-                timeLeft--;
             }, 1000);
         }
 
         function sync() { audio.volume = document.getElementById('vol').value; }
-        function toggle(e) { 
-            e.stopPropagation(); 
-            audio.paused ? (audio.play(), pbtn.innerText="STOP") : (audio.pause(), pbtn.innerText="PLAY");
-        }
+        function toggle(e) { e.stopPropagation(); audio.paused ? audio.play() : audio.pause(); pbtn.innerText = audio.paused ? "PLAY" : "STOP"; }
         function autoPlay() { if(audio.paused) audio.play().then(()=>pbtn.innerText="STOP").catch(()=>{}); }
 
-        window.addEventListener('resize', resize);
-        window.onload = () => { 
-            changeBG();
-            bgImg.onload = () => { resize(); draw(); };
-        };
+        window.onload = () => { changeBG(); bgImg.onload = () => { resize(); draw(); } };
+        window.onresize = resize;
     </script>
 </body>
 </html>
