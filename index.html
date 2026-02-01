@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova's Pensieve - Perfect Refraction</title>
+    <title>Nova's Pensieve - Ultra Refraction</title>
     <style>
         :root { --glass: rgba(0, 0, 0, 0.7); --border: rgba(255, 255, 255, 0.15); --gold: #d4af37; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: serif; }
@@ -24,10 +24,12 @@
         .discipline-center { position: absolute; top: 45%; left: 55%; transform: translate(-50%, -50%); width: 85%; max-width: 450px; z-index: 10; }
         details { background: rgba(10, 15, 25, 0.9); border: 1px solid var(--gold); padding: 25px; border-radius: 20px; backdrop-filter: blur(25px); box-shadow: 0 30px 60px rgba(0,0,0,0.8); }
         summary { font-size: 1.1rem; letter-spacing: 5px; cursor: pointer; color: var(--gold); list-style: none; text-align: center; outline: none; }
-        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 2rem; margin: 10px 0; display: none; }
-        .rules { margin-top: 20px; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; }
+        #timer-box { font-family: monospace; color: var(--gold); text-align: center; font-size: 2rem; margin: 15px 0; display: none; text-shadow: 0 0 10px var(--gold); }
+        .rules { margin-top: 20px; color: #bbb; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 15px; line-height: 1.6; }
 
         .bottom-bar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--glass); padding: 10px 30px; border-radius: 50px; display: flex; gap: 20px; align-items: center; z-index: 10; border: 1px solid var(--border); }
+        .ctrl-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #999; }
+        input[type=range] { accent-color: var(--gold); width: 80px; }
         .play-btn { background: none; border: 1px solid var(--gold); color: var(--gold); border-radius: 20px; padding: 5px 20px; cursor: pointer; font-size: 11px; }
     </style>
 </head>
@@ -46,19 +48,21 @@
             <summary>✧ DISCIPLINE ✧</summary>
             <div id="timer-box">05:00</div>
             <div class="rules">
-                1. <b>情绪拦截</b>：焦虑产生时，启动拦截。<br>
+                1. <b>情绪拦截</b>：产生焦虑时，启动冷静倒计时。<br>
                 <button class="play-btn" style="width:100%; margin-top:15px;" onclick="startIntercept(300)">启动冷静拦截</button>
             </div>
         </details>
     </div>
 
     <div class="bottom-bar">
-        <select id="bg-select" onchange="changeBG()" style="background:#000; color:white; border:none;">
-            <option value="pensive.png">Pensive</option>
-            <option value="train.png">Express</option>
-        </select>
-        <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5" oninput="sync()">
-        <input type="range" id="rain-den" min="20" max="100" value="40" oninput="initRain()">
+        <div class="ctrl-item">🖼️ 
+            <select id="bg-select" onchange="changeBG()" style="background:#000; color:white; border:none;">
+                <option value="pensive.png">Pensive</option>
+                <option value="train.png">Express</option>
+            </select>
+        </div>
+        <div class="ctrl-item">🔊 <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5" oninput="sync()"></div>
+        <div class="ctrl-item">🌧️ <input type="range" id="rain-den" min="20" max="100" step="1" value="40" oninput="initRain()"></div>
         <button id="pbtn" class="play-btn" onclick="toggle(event)">PLAY</button>
     </div>
 
@@ -71,17 +75,13 @@
         const stage = document.getElementById('main-stage');
         const bgImg = new Image();
 
-        const dropAlpha = new Image();
-        dropAlpha.src = 'drop-alpha.png'; // 确保文件名与你下载的一致
-        const dropColor = new Image();
-        dropColor.src = 'drop-color.png';
+        // 加载你描述的素材
+        const imgShape = new Image(); imgShape.src = 'drop.png'; // 黑色圆点图
+        const imgColor = new Image(); imgColor.src = 'alpha.png'; // 彩色方块图
 
         let drops = [];
         let timerInterval;
-
-        // 图片在大图里的行列数 (Rainyscope 通常是 5x5)
-        const cols = 5;
-        const rows = 5;
+        const spriteSize = 5; // 假设是 5x5 的布局
 
         function changeBG() {
             const val = document.getElementById('bg-select').value;
@@ -98,32 +98,25 @@
         function initRain() {
             drops = [];
             const density = document.getElementById('rain-den').value;
-            document.documentElement.style.setProperty('--fog', (density/20) + 'px');
-            
-            // 计算单颗雨滴在原始图中的尺寸
-            const sw = dropAlpha.width / cols;
-            const sh = dropAlpha.height / rows;
-
+            const sw = imgShape.width / spriteSize;
+            const sh = imgShape.height / spriteSize;
             for (let i = 0; i < density; i++) {
                 drops.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    // 随机选一颗贴纸
-                    si: Math.floor(Math.random() * cols) * sw,
-                    sj: Math.floor(Math.random() * rows) * sh,
-                    sw: sw,
-                    sh: sh,
-                    s: Math.random() * 0.4 + 0.2, 
-                    v: Math.random() * 1.5 + 0.5, 
-                    a: Math.random() * 0.6 + 0.3  
+                    sx: Math.floor(Math.random() * spriteSize) * sw,
+                    sy: Math.floor(Math.random() * spriteSize) * sh,
+                    sw: sw, sh: sh,
+                    s: Math.random() * 0.3 + 0.2,
+                    v: Math.random() * 1.5 + 0.8,
+                    a: Math.random() * 0.5 + 0.3
                 });
             }
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            if (!bgImg.complete || !dropAlpha.complete) {
+            if (!bgImg.complete || !imgShape.complete) {
                 requestAnimationFrame(draw);
                 return;
             }
@@ -133,24 +126,23 @@
                 const dh = d.sh * d.s;
 
                 ctx.save();
-                ctx.translate(d.x, d.y);
                 
-                // 1. 剪裁出正确的雨滴形状
-                ctx.globalAlpha = d.a;
-                ctx.drawImage(dropAlpha, d.si, d.sj, d.sw, d.sh, 0, 0, dw, dh);
-
-                // 2. 核心折射
-                ctx.globalCompositeOperation = 'source-in';
+                // 步骤 1: 绘制折射背景（在大图范围内偏移）
+                ctx.beginPath();
                 ctx.save();
-                ctx.translate(-d.x, -d.y + 15); 
-                ctx.filter = 'brightness(1.2) contrast(1.1)';
-                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                ctx.translate(d.x, d.y);
+                // 模拟水滴内部的倒置或位移
+                ctx.drawImage(bgImg, d.x, d.y - 20, dw, dh, 0, 0, dw, dh);
                 ctx.restore();
 
-                // 3. 叠加反光彩色
+                // 步骤 2: 使用“黑色圆点”作为模具切掉多余背景 (让方块变圆)
+                ctx.globalCompositeOperation = 'destination-in';
+                ctx.drawImage(imgShape, d.sx, d.sy, d.sw, d.sh, d.x, d.y, dw, dh);
+
+                // 步骤 3: 叠加“彩色光谱”增加质感 (只在亮部显色)
                 ctx.globalCompositeOperation = 'screen';
                 ctx.globalAlpha = 0.4;
-                ctx.drawImage(dropColor, d.si, d.sj, d.sw, d.sh, 0, 0, dw, dh);
+                ctx.drawImage(imgColor, d.sx, d.sy, d.sw, d.sh, d.x, d.y, dw, dh);
 
                 ctx.restore();
 
@@ -180,7 +172,7 @@
         function toggle(e) { e.stopPropagation(); audio.paused ? audio.play() : audio.pause(); pbtn.innerText = audio.paused ? "PLAY" : "STOP"; }
         function autoPlay() { if(audio.paused) audio.play().then(()=>pbtn.innerText="STOP").catch(()=>{}); }
 
-        window.onload = () => { changeBG(); bgImg.onload = () => { resize(); draw(); } };
+        window.onload = () => { changeBG(); imgShape.onload = () => { resize(); draw(); } };
         window.onresize = resize;
     </script>
 </body>
