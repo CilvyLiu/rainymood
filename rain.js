@@ -137,12 +137,12 @@
         // 1. 生成新雨滴
         if (Math.random() < this.options.rainChance) {
             this.drops.push({
+                // 确保 x 坐标覆盖整个物理宽度
                 x: Math.random() * this.dropCanvas.width,
                 y: -100,
-                // 确保半径受 ratio 保护，不至于太小
                 r: (Math.random() * (this.options.maxR - this.options.minR) + this.options.minR) * this.ratio,
-                // 显著提升下落速度感
-                v: ((this.options.baseSpeed || 4) + Math.random() * 5) * this.ratio 
+                // 给速度一个保底值，确保它们能“飞”下来
+                v: (Math.max(this.options.baseSpeed, 4) + Math.random() * 5) * this.ratio 
             });
         }
 
