@@ -2,61 +2,13 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Nova's Pensieve - Rainyscope Fusion</title>
-    <style>
-        :root { 
-            --glass: rgba(255, 255, 255, 0.03); 
-            --blur: blur(20px); 
-            --border: rgba(255, 255, 255, 0.08); 
-        }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; color: white; font-family: "PingFang SC", sans-serif; }
-        
-        /* 提升背景清晰度，使其更真实 */
-        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-position: center; background-repeat: no-repeat; background-size: cover; z-index: 1; transition: 1.5s; filter: blur(3px) brightness(0.6); }
-        #rainCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.4) 100%); z-index: 2; pointer-events: none; }
-
-        .side-nav { position: fixed; left: 25px; top: 50%; transform: translateY(-50%); z-index: 100; display: flex; flex-direction: column; gap: 15px; }
-        .nav-item { 
-            width: 45px; height: 45px; background: var(--glass); backdrop-filter: var(--blur); 
-            border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; 
-            justify-content: center; text-decoration: none; font-size: 18px; transition: 0.4s;
-        }
-        .nav-item:hover { background: rgba(255,255,255,0.1); transform: translateX(5px); border-color: #fff; }
-
-        .center-container { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; width: 500px; }
-        .rule-card { 
-            background: rgba(10, 10, 10, 0.5); backdrop-filter: blur(40px); 
-            border: 1px solid var(--border); border-radius: 24px; padding: 40px;
-            display: none; transition: 0.5s ease-in-out; margin-bottom: 25px;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
-        }
-        .rule-card h2 { letter-spacing: 8px; font-weight: 200; margin-bottom: 25px; color: #fff; opacity: 0.9; }
-        .rule-card p { font-size: 15px; line-height: 2.5; color: #bbb; text-align: justify; }
-
-        .bottom-bar { 
-            position: fixed; bottom: 35px; left: 50%; transform: translateX(-50%); z-index: 100;
-            display: flex; align-items: center; gap: 20px; background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(20px); padding: 10px 30px; border-radius: 50px; border: 1px solid var(--border);
-        }
-
-        button.magic-btn { 
-            background: transparent; border: 1px solid rgba(255,255,255,0.4); color: #fff; 
-            padding: 10px 35px; border-radius: 30px; cursor: pointer; font-size: 11px;
-            letter-spacing: 3px; transition: 0.3s;
-        }
-        button.magic-btn:hover { background: #fff; color: #000; border-color: #fff; }
-
-        select { background: transparent; color: #fff; border: none; padding: 5px; cursor: pointer; font-size: 12px; outline: none; }
-        input[type=range] { accent-color: #fff; width: 70px; height: 3px; }
-        label { font-size: 9px; opacity: 0.5; letter-spacing: 1px; }
-    </style>
+    <title>Nova's Pensieve - WebGL Ultra</title>
+    <link rel="stylesheet" href="rain.css">
 </head>
 <body onclick="initAudio()">
 
-    <div id="viewport"></div>
+    <div id="container" style="width:100%; height:100%; position:fixed;"></div>
     <div id="overlay"></div>
-    <canvas id="rainCanvas"></canvas>
 
     <div class="side-nav">
         <a href="https://gringott.streamlit.app/" target="_blank" class="nav-item">🏦</a>
@@ -69,41 +21,58 @@
         <div class="rule-card" id="mainRule">
             <h2>看板纪律</h2>
             <p>
-                <b>壹 · 深潜</b>：入冥想盆，如水滴融入深潭，剥离万千杂念。<br>
-                <b>贰 · 精准</b>：逻辑如冰晶碎裂，每一行数据皆有因果。<br>
-                <b>叁 · 韧性</b>：纵使雨幕遮眼，亦要在波动中攫取永恒之趋势。<br>
-                <b>肆 · 进化</b>：日拱一卒，复盘为魂，以此身炼就破局之法。
+                <b>壹 · 深潜</b>：入冥想盆，如水滴融入深潭。<br>
+                <b>贰 · 精准</b>：逻辑如冰晶碎裂，数据皆有因果。<br>
+                <b>叁 · 韧性</b>：纵使雨幕遮眼，亦要攫取趋势。<br>
+                <b>肆 · 进化</b>：日拱一卒，以此身炼就破局之法。
             </p>
         </div>
         <button class="magic-btn" onclick="toggleRules(event)">FOCUS MODE</button>
     </div>
 
     <div class="bottom-bar">
-        <div id="clock" style="font-size: 13px; letter-spacing: 2px; font-weight: 200; min-width: 80px;"></div>
+        <div id="clock">00:00:00</div>
         <label>VOLUME</label> <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" oninput="sync()">
-        <label>STORM</label> <input type="range" id="den" min="20" max="400" value="120" oninput="initRain()">
-        <select onchange="handleSceneChange(this)">
-            <option value="pensive.png|contain">🏺 冥想盆</option>
-            <option value="train.png|cover">🚂 霍格沃茨</option>
-            <option value="window.png|cover">🪟 落地窗</option>
-            <option value="beach.png|cover">🏖️ 贝壳小屋</option>
+        
+        <select id="weatherSelect" onchange="changeWeather()">
+            <option value="rain">🌧️ 细雨</option>
+            <option value="storm">⛈️ 暴雨</option>
+            <option value="drizzle">🌦️ 阵雨</option>
+            <option value="sunny">☀️ 晴朗</option>
         </select>
-        <button id="pbtn" onclick="toggleAudio(event)" style="background: none; border: none; color: white; cursor: pointer; font-size: 14px; opacity: 0.7;">▶</button>
+
+        <select id="sceneSelect" onchange="changeScene()">
+            <option value="pensive.png">🏺 冥想盆</option>
+            <option value="train.png">🚂 霍格沃茨</option>
+            <option value="window.png">🪟 落地窗</option>
+            <option value="beach.png">🏖️ 贝壳小屋</option>
+            <option value="mountain.png">🏔️ 雪山</option>
+        </select>
+        <button id="pbtn" onclick="toggleAudio(event)">▶</button>
     </div>
 
     <audio id="audio" loop src="0.m4a"></audio>
 
+    <script src="rain.js"></script>
     <script>
-        const canvas = document.getElementById('rainCanvas');
-        const ctx = canvas.getContext('2d');
-        const viewport = document.getElementById('viewport');
         const audio = document.getElementById('audio');
-        const imgMask = new Image(); imgMask.src = 'drop-color.png'; 
-        const imgAlpha = new Image(); imgAlpha.src = 'drop-alpha.png'; 
-        const bgImg = new Image();
-        let drops = [];
-        const sprite = 5;
+        const pbtn = document.getElementById('pbtn');
 
+        // 切换场景（背景图）
+        function changeScene() {
+            const scene = document.getElementById('sceneSelect').value;
+            // 这里的逻辑需要根据你的 rain.js 暴露的接口调整
+            // 通常是更新 renderer 里的背景纹理
+            document.getElementById('container').style.backgroundImage = `url(${scene})`;
+        }
+
+        // 切换天气模式（对应 rain.js 里的 Z 对象）
+        function changeWeather() {
+            const weather = document.getElementById('weatherSelect').value;
+            window.location.hash = weather; // 触发 rain.js 里的 hashchange 事件
+        }
+
+        // 基础交互
         function toggleRules(e) {
             e.stopPropagation();
             const card = document.getElementById('mainRule');
@@ -112,124 +81,25 @@
             e.target.innerText = isOpen ? 'FOCUS MODE' : 'RELEASE';
         }
 
-        function handleSceneChange(select) {
-            const [img, size] = select.value.split('|');
-            viewport.style.backgroundImage = `url('${img}')`;
-            viewport.style.backgroundSize = size;
-            bgImg.src = img;
-        }
-
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            initRain();
-        }
-
-        function initRain() {
-            drops = [];
-            const density = document.getElementById('den').value;
-            for (let i = 0; i < density; i++) {
-                const isHeavy = Math.random() > 0.85;
-                drops.push({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
-                    si: Math.floor(Math.random() * sprite),
-                    sj: Math.floor(Math.random() * sprite),
-                    s: isHeavy ? (Math.random() * 0.35 + 0.25) : (Math.random() * 0.12 + 0.05),
-                    v: 0,
-                    isHeavy: isHeavy,
-                    tension: Math.random() * 0.15 + 0.85, 
-                    trail: [] // 拖拽痕迹
-                });
-            }
-        }
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (!imgMask.complete || !imgAlpha.complete) { requestAnimationFrame(draw); return; }
-
-            drops.sort((a,b) => a.s - b.s).forEach(d => {
-                const sw = imgMask.width / sprite;
-                const sh = imgMask.height / sprite;
-                const dw = sw * d.s;
-                const dh = dw * (d.isHeavy ? 1.6 : 1.3);
-
-                // 绘制水痕（Rainyscope 灵魂）
-                if (d.isHeavy && d.trail.length > 0) {
-                    ctx.save();
-                    ctx.globalAlpha = 0.15;
-                    ctx.beginPath();
-                    d.trail.forEach((t, i) => {
-                        ctx.lineTo(t.x, t.y);
-                    });
-                    ctx.strokeStyle = "rgba(255,255,255,0.3)";
-                    ctx.lineWidth = dw * 0.5;
-                    ctx.lineCap = "round";
-                    ctx.stroke();
-                    ctx.restore();
-                }
-
-                ctx.save();
-                ctx.translate(d.x, d.y);
-                
-                // 物理裁剪
-                ctx.beginPath();
-                ctx.moveTo(dw/2, 0);
-                ctx.bezierCurveTo(dw, dh*0.3, dw, dh, dw/2, dh);
-                ctx.bezierCurveTo(0, dh, 0, dh*0.3, dw/2, 0);
-                ctx.clip(); 
-
-                // 透明感采样：背景反向及放大
-                if (bgImg.complete) {
-                    ctx.scale(1.1, -1.1); // 模拟折射率
-                    ctx.drawImage(bgImg, d.x, d.y, dw*1.5, dh*1.5, -dw/2, -dh/2, dw*2, dh*2);
-                    ctx.scale(1/1.1, -1/1.1);
-                }
-
-                ctx.globalAlpha = d.isHeavy ? 0.95 : 0.6;
-                ctx.globalCompositeOperation = 'screen';
-                ctx.drawImage(imgAlpha, d.si*sw, d.sj*sh, sw, sh, 0, 0, dw, dh);
-                ctx.globalCompositeOperation = 'multiply';
-                ctx.drawImage(imgMask, d.si*sw, d.sj*sh, sw, sh, 0, 0, dw, dh);
-                ctx.restore();
-
-                // 物理引擎：模拟表面张力突破
-                if (d.isHeavy) {
-                    if (Math.random() > 0.97) d.v += 0.95; // 积蓄重力突破张力
-                    d.v *= d.tension; 
-                    d.y += d.v;
-                    d.x += Math.sin(d.y/30) * 0.2; 
-
-                    // 记录痕迹
-                    if (d.v > 0.5) {
-                        d.trail.push({x: d.x + dw/2, y: d.y});
-                        if (d.trail.length > 15) d.trail.shift();
-                    }
-                    
-                    if (Math.random() > 0.985) d.v *= 0.1; // 重新被张力捕获
-                } else {
-                    d.y += 0.15; // 静止雨点极其微小的蠕动
-                }
-
-                if (d.y > canvas.height) {
-                    d.y = -dh; d.x = Math.random()*canvas.width; d.v = 0; d.trail = [];
-                }
-            });
-            requestAnimationFrame(draw);
-        }
-
         function sync() { audio.volume = document.getElementById('vol').value; }
-        function initAudio() { if(audio.paused) { audio.play(); pbtn.innerText = "⏸"; } }
-        function toggleAudio(e) { e.stopPropagation(); audio.paused ? audio.play() : audio.pause(); pbtn.innerText = audio.paused ? "▶" : "⏸"; }
+        
+        function initAudio() { 
+            if(audio.paused) { audio.play(); pbtn.innerText = "⏸"; } 
+        }
+
+        function toggleAudio(e) { 
+            e.stopPropagation(); 
+            audio.paused ? audio.play() : audio.pause(); 
+            pbtn.innerText = audio.paused ? "▶" : "⏸"; 
+        }
+
         function updateClock() {
             const now = new Date();
             document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour12: false});
         }
-        window.onload = () => {
-            handleSceneChange({value: 'pensive.png|contain'});
-            resize(); draw(); setInterval(updateClock, 1000); updateClock();
-        };
-        window.addEventListener('resize', resize);
+
+        setInterval(updateClock, 1000);
+        updateClock();
     </script>
 </body>
 </html>
