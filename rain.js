@@ -83,32 +83,30 @@
     };
 
     RainRenderer.prototype.resize = function() {
-    // 获取屏幕逻辑尺寸
     this.width = window.innerWidth;
     this.height = window.innerHeight;
     this.ratio = window.devicePixelRatio || 1;
 
-    // 1. 修正 CSS：禁止溢出，固定全屏
     this.container.style.overflow = 'hidden';
     this.canvas.style.position = 'absolute';
     this.canvas.style.width = this.width + 'px';
     this.canvas.style.height = this.height + 'px';
 
-    // 2. 修正物理像素：这是防止“被拽大”的关键
     const realW = Math.floor(this.width * this.ratio);
     const realH = Math.floor(this.height * this.ratio);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
     this.canvas.width = realW;
     this.canvas.height = realH;
     
-    // 3. 必须同步离屏 Canvas 尺寸
     if (this.dropCanvas) {
         this.dropCanvas.width = realW;
         this.dropCanvas.height = realH;
     }
 
-    // 4. 核心：重设 WebGL 视口，强制 1:1 匹配
-    this.gl.viewport(0, 0, realW, realH);
+    // 错误修正点：从 gl.viewport 改为 this.gl.viewport
+    if (this.gl) {
+        this.gl.viewport(0, 0, realW, realH);
+    }
 };
   RainRenderer.prototype.updateBackground = function(url) {
     const gl = this.gl;
@@ -127,19 +125,21 @@
 };
 
     RainRenderer.prototype.updateBackground = function(url) {
-        const gl = this.gl;
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-            gl.bindTexture(gl.TEXTURE_2D, this.texBg);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        };
-        img.src = url;
+    const gl = this.gl;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        
+        // 关键：设置包裹模式防止图片被强制拉伸/拽大
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     };
+    img.src = url;
+};
 
    RainRenderer.prototype.loop = function() {
         // 1. 生成新雨滴
@@ -192,10 +192,10 @@
         gl.uniform1i(loc("u_water"), 1);
 
         // --- 核心调优：解决“细线”和“隐形” ---
-        gl.uniform1f(loc("u_br"), 1.2);        // 增加亮度，让雨滴更晶莹
-        gl.uniform1f(loc("u_aMult"), 20.0);    // 极大对比度
-        gl.uniform1f(loc("u_aSub"), 0.15);     // 极低扣除：确保即使是细雨也能显形
-        gl.uniform1f(loc("u_ref"), 0.5);       // 增强折射效果
+        gl.uniform1f(loc("u_br"), 1.2);        // 提亮雨滴高光
+        gl.uniform1f(loc("u_aMult"), 30.0);    // 显著提高对比度，强制让雨滴显影
+        gl.uniform1f(loc("u_aSub"), 0.05);     // 降低扣除量，确保能看到水汽痕迹
+        gl.uniform1f(loc("u_ref"), 0.25);      // 降低折射率，防止背景因折射而过度变形
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         requestAnimationFrame(this.loop.bind(this));
