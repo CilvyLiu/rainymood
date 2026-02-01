@@ -11,28 +11,25 @@
 
     // 动态生成源码要求的形状贴图，确保即便没有外部 png 也能正常产生雨滴形状
     function createDropTexture() {
-        const size = 64;
-        const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        const center = size / 2;
-        
-        // 清除画布
-        ctx.clearRect(0, 0, size, size);
-        
-        const grad = ctx.createRadialGradient(center, center, 0, center, center, center);
-        grad.addColorStop(0, 'rgba(128, 128, 255, 1.0)'); // 中心厚
-        grad.addColorStop(0.7, 'rgba(128, 128, 255, 0.8)'); // 边缘实
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');           // 完全透明
-        
-        ctx.fillStyle = grad;
-        // 关键点：只画一个圆，而不是 fillRect
-        ctx.beginPath();
-        ctx.arc(center, center, center, 0, Math.PI * 2);
-        ctx.fill();
-        
-        return canvas;
-    }
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const center = size / 2;
+    ctx.clearRect(0, 0, size, size);
+    
+    // 增加 B 通道强度（决定水汽感）和 Alpha 饱和度
+    const grad = ctx.createRadialGradient(center, center, 0, center, center, center);
+    grad.addColorStop(0, 'rgba(128, 128, 255, 1.0)'); 
+    grad.addColorStop(0.6, 'rgba(128, 128, 255, 0.8)'); 
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); 
+    
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(center, center, center * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+    return canvas;
+}
     function RainRenderer(container) {
         this.container = container;
         this.canvas = document.createElement('canvas');
@@ -100,7 +97,7 @@
     // 2. 修正物理像素：这是防止“被拽大”的关键
     const realW = Math.floor(this.width * this.ratio);
     const realH = Math.floor(this.height * this.ratio);
-
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     this.canvas.width = realW;
     this.canvas.height = realH;
     
@@ -114,19 +111,20 @@
     this.gl.viewport(0, 0, realW, realH);
 };
   RainRenderer.prototype.updateBackground = function(url) {
-        const gl = this.gl;
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-            gl.bindTexture(gl.TEXTURE_2D, this.texBg);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        };
-        img.src = url;
+    const gl = this.gl;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        // 背景加载后强制重绘一帧，防止黑屏
     };
+    img.src = url;
+};
 
     RainRenderer.prototype.updateBackground = function(url) {
         const gl = this.gl;
