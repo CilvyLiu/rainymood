@@ -76,21 +76,32 @@
     RainRenderer.prototype.init = function() {
         const gl = this.gl;
         const vs = `attribute vec2 p;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=p*0.5+0.5;v.y=1.0-v.y;}`;
+        // 修改 FS 中处理 water 纹理的部分，加入扭曲逻辑
         const fs = `
             precision mediump float;
             uniform sampler2D u_bg, u_water;
             uniform vec2 u_res, u_bgRes;
             varying vec2 v;
             uniform float u_ref, u_aMult, u_aSub;
+        
             void main() {
                 vec2 s = u_res / u_bgRes;
                 float scale = max(s.x, s.y);
                 vec2 uv = (v - 0.5) * (s / scale) + 0.5;
+        
+                // 5. 模拟折射形变：雨滴应该对背景产生“透镜”收缩效果
                 vec4 water = texture2D(u_water, v);
-                vec2 offset = (water.rg - 0.5) * u_ref * 0.2; // 稍微增加折射感
+                
+                // 利用 water.b (质量/高度) 来做更真实的折射
+                // 这里的 0.2 是折射率，让背景看起来像被吸进雨滴里
+                vec2 refractionOffset = (water.rg - 0.5) * u_ref * water.b;
+                
                 float alpha = clamp(water.a * u_aMult - u_aSub, 0.0, 1.0);
-                vec4 bg = texture2D(u_bg, uv + offset);
-                gl_FragColor = mix(bg, bg + water.b * 0.3, alpha);
+                vec4 bg = texture2D(u_bg, uv + refractionOffset);
+                
+                // 增加高光感 (Specular)
+                float highlight = pow(water.b, 3.0) * 0.3;
+                gl_FragColor = mix(bg, bg + highlight, alpha);
             }
         `;
 
@@ -181,31 +192,58 @@
         const dt = Math.min((now - this.lastTime) / 1000, 0.033);
         this.lastTime = now;
 
+        // 1. 随机生成：引入大小区间 [30, 80]，模拟附件中的 spawnSize
         if (Math.random() < CONFIG.spawnInterval) {
-            // 增加雨滴初始大小，确保清晰可见
-            this.drops.push(new RainDrop(Math.random() * this.waterCanvas.width, -50, 35, this.ratio));
+            const size = (Math.random() * 50 + 30); // 随机大小
+            const drop = new RainDrop(Math.random() * this.waterCanvas.width, -100, size, this.ratio);
+            
+            // 注入附件 raindrop.ts 中的随机运动参数
+            drop.shifting = (Math.random() - 0.5) * 120 * this.ratio; // 水平偏移力
+            drop.nextRandomTime = Math.random() * 2; // 随机动作频率
+            this.drops.push(drop);
         }
 
         const ctx = this.waterCtx;
         ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
+        // 2. 绘制静态拖尾（水痕）
         for (let i = this.staticDrops.length - 1; i >= 0; i--) {
             let s = this.staticDrops[i];
-            s.r -= dt * 3; 
+            s.r -= dt * 2.5; 
             if (s.r < 1) { this.staticDrops.splice(i, 1); continue; }
             ctx.drawImage(this.dropShape, s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
         }
 
+        // 3. 绘制动态雨滴（带物理效果）
         for (let i = this.drops.length - 1; i >= 0; i--) {
             let d = this.drops[i];
+            
+            // 更新物理逻辑：增加水平摆动，不再直线下落
+            d.x += Math.sin(d.y * 0.02 + d.nextRandomTime) * d.shifting * dt * 0.5;
+            
             if (d.update(dt, this.waterCanvas.height)) {
-                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.5 });
+                // 留下随机大小的拖尾
+                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * (Math.random() * 0.2 + 0.3) });
             }
+            
             if (d.terminated) { this.drops.splice(i, 1); continue; }
-            const h = d.r * (1.5 + d.velocity / 1200);
-            ctx.drawImage(this.dropShape, d.x - d.r, d.y - h/2, d.r * 2, h);
+            
+            // 计算符合物理事实的拉伸：速度快则细长
+            const stretch = 1.2 + (d.velocity / 2000);
+            const w = d.r * 2;
+            const h = d.r * 2 * stretch;
+
+            // 绘制旋转的雨滴，使其方向始终指向运动方向
+            ctx.save();
+            ctx.translate(d.x, d.y);
+            // 计算运动倾角
+            const angle = Math.atan2(Math.sin(d.y * 0.02 + d.nextRandomTime) * d.shifting * 0.1, d.velocity);
+            ctx.rotate(-angle); 
+            ctx.drawImage(this.dropShape, -w / 2, -h / 2, w, h);
+            ctx.restore();
         }
 
+        // WebGL 渲染部分
         if (!this.backgroundLoaded) return requestAnimationFrame(t => this.loop(t));
 
         const gl = this.gl;
@@ -216,7 +254,6 @@
         
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
-        // --- 【核心步骤：每一帧重新上传雨滴位图】 ---
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
 
         const loc = (n) => gl.getUniformLocation(this.prog, n);
@@ -231,7 +268,6 @@
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         requestAnimationFrame(t => this.loop(t));
     };
-
     window.addEventListener('load', () => {
         const container = document.getElementById('container');
         if(!container) return;
