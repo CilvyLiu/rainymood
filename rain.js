@@ -53,13 +53,12 @@
         this.container = container;
         this.canvas = document.createElement('canvas');
         container.appendChild(this.canvas);
-        this.gl = this.canvas.getContext('webgl', { alpha: false });
+        this.gl = this.canvas.getContext('webgl', { alpha: false, depth: false });
         this.drops = [];
         this.staticDrops = [];
         this.lastTime = 0;
         this.backgroundLoaded = false;
         
-        // 联动参数
         this.spawnChance = 0.08;
         this.sizeRange = [12, 35];
         this.fadeSpeed = 2.5;
@@ -91,9 +90,16 @@
         `;
 
         const prog = gl.createProgram();
-        const shader = (t, s) => { const h = gl.createShader(t); gl.shaderSource(h, s); gl.compileShader(h); gl.attachShader(prog, h); };
-        shader(gl.VERTEX_SHADER, vs); shader(gl.FRAGMENT_SHADER, fs);
-        gl.linkProgram(prog); gl.useProgram(prog);
+        const shader = (t, s) => { 
+            const h = gl.createShader(t); 
+            gl.shaderSource(h, s); 
+            gl.compileShader(h); 
+            gl.attachShader(prog, h); 
+        };
+        shader(gl.VERTEX_SHADER, vs); 
+        shader(gl.FRAGMENT_SHADER, fs);
+        gl.linkProgram(prog); 
+        gl.useProgram(prog);
         this.prog = prog;
 
         this.texBg = gl.createTexture();
@@ -109,7 +115,7 @@
         gl.vertexAttribPointer(p, 2, gl.FLOAT, false, 0, 0);
 
         this.resize();
-        this.updateBackground('pensive.png'); // 默认加载
+        this.updateBackground('pensive.png');
         requestAnimationFrame(t => this.loop(t));
     };
 
@@ -139,8 +145,12 @@
 
     RainRenderer.prototype.resize = function() {
         this.ratio = window.devicePixelRatio || 1;
-        this.canvas.width = this.waterCanvas.width = window.innerWidth * this.ratio;
-        this.canvas.height = this.waterCanvas.height = window.innerHeight * this.ratio;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        this.canvas.width = w * this.ratio;
+        this.canvas.height = h * this.ratio;
+        this.waterCanvas.width = w * this.ratio;
+        this.waterCanvas.height = h * this.ratio;
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     };
 
@@ -152,17 +162,17 @@
             gl.bindTexture(gl.TEXTURE_2D, this.texBg);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             this.bgImage = img;
             this.backgroundLoaded = true;
         };
-        // 如果图片加载失败，给一个深色的兜底图，确保雨滴可见
         img.onerror = () => {
             const dummy = document.createElement('canvas');
             dummy.width = dummy.height = 2;
             const dctx = dummy.getContext('2d');
-            dctx.fillStyle = '#111'; dctx.fillRect(0,0,2,2);
+            dctx.fillStyle = '#050505'; dctx.fillRect(0,0,2,2);
             this.bgImage = dummy;
             this.backgroundLoaded = true;
         };
@@ -176,36 +186,28 @@
         if (Math.random() < this.spawnChance) {
             const r = this.sizeRange;
             const size = Math.random() * (r[1] - r[0]) + r[0];
+            // 确保生成位置在画布宽度内
             this.drops.push(new RainDrop(Math.random() * this.waterCanvas.width, -100, size, this.ratio, this));
         }
 
         const ctx = this.waterCtx;
         ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
-        // 合并逻辑
-        this.drops.sort((a,b) => a.y - b.y);
-        for(let i=0; i<this.drops.length; i++) {
-            for(let j=i+1; j<this.drops.length; j++) {
-                let d1 = this.drops[i], d2 = this.drops[j];
-                if(d1.terminated || d2.terminated) continue;
-                let dist = Math.sqrt(Math.pow(d1.x-d2.x,2)+Math.pow(d1.y-d2.y,2));
-                if(dist < (d1.r + d2.r)*0.8) { d2.r += d1.r*0.2; d1.terminated = true; }
-            }
-        }
-
         // 绘制逻辑
         [this.staticDrops, this.drops].forEach((list, idx) => {
             for (let i = list.length - 1; i >= 0; i--) {
                 let d = list[i];
-                if (idx === 0) d.r -= dt * this.fadeSpeed; // static
+                if (idx === 0) d.r -= dt * this.fadeSpeed;
                 else if (d.update(dt, this.waterCanvas.height)) {
-                    this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.4, initialAngle: Math.atan2(d.vx, d.vy) });
+                    this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.45, terminated: false });
                 }
-                if (d.terminated || d.r < 1) { list.splice(i, 1); continue; }
+                
+                if (d.terminated || d.r < 0.5) { list.splice(i, 1); continue; }
 
                 ctx.save();
                 ctx.translate(d.x, d.y);
-                if (idx === 1) ctx.rotate(-Math.atan2(d.vx, d.vy));
+                if (idx === 1) ctx.rotate(Math.atan2(d.vx, d.vy));
+                // 关键修正：以中心点对齐绘制
                 ctx.drawImage(this.dropShape, -d.r, -d.r, d.r * 2, d.r * 2);
                 ctx.restore();
             }
@@ -214,14 +216,23 @@
         if (!this.backgroundLoaded) return requestAnimationFrame(t => this.loop(t));
         
         const gl = this.gl;
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texBg);
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texWater);
+        // 更新水滴纹理
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.texWater);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        // 绑定背景纹理
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
 
         const loc = (n) => gl.getUniformLocation(this.prog, n);
-        gl.uniform1i(loc("u_bg"), 0); gl.uniform1i(loc("u_water"), 1);
+        gl.uniform1i(loc("u_bg"), 0);
+        gl.uniform1i(loc("u_water"), 1);
         gl.uniform2f(loc("u_res"), this.canvas.width, this.canvas.height);
-        gl.uniform2f(loc("u_bgRes"), this.bgImage.width || 1, this.bgImage.height || 1);
+        gl.uniform2f(loc("u_bgRes"), this.bgImage.width, this.bgImage.height);
         gl.uniform1f(loc("u_ref"), CONFIG.refraction);
         gl.uniform1f(loc("u_aMult"), CONFIG.alphaMultiply);
         gl.uniform1f(loc("u_aSub"), CONFIG.alphaSubtract);
@@ -232,5 +243,8 @@
 
     window.addEventListener('load', () => {
         new RainRenderer(document.getElementById('container'));
+    });
+    window.addEventListener('resize', () => {
+        if(window.rainEngine) window.rainEngine.resize();
     });
 })();
