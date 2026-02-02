@@ -127,70 +127,52 @@
 };
 
    RainRenderer.prototype.loop = function() {
-    // 1. 生成新雨滴
+    // 1. 物理层：生成并更新位置
     if (Math.random() < this.options.rainChance) {
         this.drops.push({
-            // 确保 x 坐标覆盖整个物理宽度
             x: Math.random() * this.dropCanvas.width,
-            y: -150, // 从更上方开始，避免突兀出现
+            y: -50, // 初始位置稍微露头
             r: (Math.random() * (this.options.maxR - this.options.minR) + this.options.minR) * this.ratio,
-            v: (Math.max(this.options.baseSpeed, 4) + Math.random() * 5) * this.ratio 
+            v: (this.options.baseSpeed + Math.random() * 5) * this.ratio // 确保速度足够大
         });
     }
 
-    // 2. 离屏绘制
-    // 使用 'source-over' 确保 alpha 混合正常，背景颜色 rgba(0,0,0,0.1) 决定了拖尾的长度
-    this.dropCtx.globalCompositeOperation = 'source-over';
-    this.dropCtx.fillStyle = 'rgba(0, 0, 0, 0.15)'; 
+    // 2. 绘制层：必须彻底清除上一帧
+    this.dropCtx.globalCompositeOperation = 'destination-out'; // 关键：先清空
+    this.dropCtx.fillStyle = 'rgba(0, 0, 0, 0.1)';           // 产生拖尾留痕
     this.dropCtx.fillRect(0, 0, this.dropCanvas.width, this.dropCanvas.height);
+    this.dropCtx.globalCompositeOperation = 'source-over';    // 切回正常模式
 
-    this.dropCtx.globalAlpha = 0.9; 
     for (let i = this.drops.length - 1; i >= 0; i--) {
         let d = this.drops[i];
-        d.y += d.v; 
-        
-        // 关键：绘制梭形雨滴。确保使用 d.r * 2 以上的长度来体现流速感
+        d.y += d.v; // 执行掉落动画
+
+        // 绘制梭形（长条）雨滴，增加高度感 (d.r * 4)
         this.dropCtx.drawImage(
             this.dropImg, 
-            d.x - d.r * 0.8, d.y, 
-            d.r * 1.6, d.r * 4.5 
+            d.x - d.r * 0.5, d.y, 
+            d.r, d.r * 4
         ); 
 
-        if (d.y > this.dropCanvas.height + 150) {
+        // 越界移除：确保不会在内存堆积
+        if (d.y > this.dropCanvas.height + 100) {
             this.drops.splice(i, 1);
         }
     }
-    this.dropCtx.globalAlpha = 1.0;
 
-    // 3. WebGL 最终渲染
+    // 3. WebGL 渲染：强制同步纹理
     const gl = this.gl;
-    if (!gl) return;
     gl.useProgram(this.prog);
-
-    // 显式开启混合模式，防止雨滴贴图的透明区域变成黑色或消失
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-    // 绑定背景纹理到单元 0
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.texBg);
     
-    // 绑定雨滴 Canvas 纹理到单元 1
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.texWater);
+    // 关键：每一帧必须重新上传
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.dropCanvas);
 
     const loc = (n) => gl.getUniformLocation(this.prog, n);
-    
-    // 关键：必须明确告诉 Shader 采样器对应的单元编号
-    gl.uniform1i(loc("u_bg"), 0);
     gl.uniform1i(loc("u_water"), 1);
-
-    // --- 核心调优：确保显影 ---
-    gl.uniform1f(loc("u_br"), 1.2);        // 提亮雨滴高光
-    gl.uniform1f(loc("u_aMult"), 40.0);    // 极大提高 Alpha 倍率，强制在 Shader 中显影
-    gl.uniform1f(loc("u_aSub"), 0.05);     // 极低扣除量，确保哪怕是微弱的拖尾也能穿透
-    gl.uniform1f(loc("u_ref"), 0.25);      // 适度折射，防止背景过度扭曲
+    gl.uniform1f(loc("u_aMult"), 50.0); // 调高对比度，确保能看到
+    gl.uniform1f(loc("u_aSub"), 0.05);  // 调低过滤，显示拖尾
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     requestAnimationFrame(this.loop.bind(this));
