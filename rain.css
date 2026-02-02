@@ -1,4 +1,4 @@
-/* --- 1. 容器与注疏逻辑 (思辨与心法局部样式) --- */
+/* --- 1. 容器与注疏逻辑 (思辨与心法局部增强) --- */
 .rule-item {
     margin-bottom: 28px;
     transition: all 0.4s ease;
@@ -17,14 +17,14 @@
 /* 浮动注疏：默认半透明，悬停时完全显现 */
 .rule-anno {
     padding-left: 18px;
-    opacity: 0.4; /* 初始状态非常淡，减少视觉负担 */
+    opacity: 0.4; /* 初始状态淡化，减少视觉负担 */
     transform: translateY(2px);
     transition: all 0.6s cubic-bezier(0.2, 1, 0.3, 1);
 }
 
 .rule-item:hover .rule-anno {
     opacity: 1;
-    transform: translateY(0) translateX(5px); /* 悬停时向上向右微动 */
+    transform: translateY(0) translateX(5px); /* 悬停时向右微动 */
 }
 
 /* 诗词部分：作为引言 */
@@ -45,7 +45,7 @@
     color: rgba(255, 255, 255, 0.75) !important;
 }
 
-/* 标签化：让思辨/心法更像系统元数据 */
+/* 标签化：让系统元数据更具量化感 */
 .rule-anno span {
     color: #7dd3fc;
     font-size: 0.65rem;
