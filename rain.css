@@ -210,27 +210,49 @@ body, html {
     text-shadow: 0 0 10px rgba(125, 211, 252, 0.6);
 }
 
-/* 激活按钮 */
+/* --- 基础状态：极简低调 --- */
 .magic-btn {
-    background: rgba(255,255,255,0.05); 
-    color: rgba(255,255,255,0.6);
-    border: 1px solid rgba(255,255,255,0.2); 
+    background: rgba(0, 0, 0, 0.4); 
+    color: rgba(125, 211, 252, 0.5); /* 淡淡的荧光蓝，预示能量 */
+    border: 1px solid rgba(125, 211, 252, 0.2); 
     padding: 12px 30px;
     letter-spacing: 4px; 
     cursor: pointer; 
-    transition: 0.4s; 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
     border-radius: 30px;
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(10px);
     font-size: 0.8rem;
+    position: relative;
+    overflow: hidden;
 }
 
+/* --- Hover 状态：荧光过载 --- */
 .magic-btn:hover { 
     color: #fff; 
-    border-color: #fff; 
-    background: rgba(255,255,255,0.15); 
-    box-shadow: 0 0 20px rgba(255,255,255,0.1);
+    border-color: #7dd3fc; 
+    background: rgba(125, 211, 252, 0.2); 
+    /* 核心：更强的外发光 + 内部发光 */
+    box-shadow: 0 0 25px rgba(125, 211, 252, 0.5), inset 0 0 10px rgba(125, 211, 252, 0.3);
+    text-shadow: 0 0 8px #7dd3fc;
+    transform: translateY(-1px) scale(1.02);
 }
 
+/* --- 关闭瞬间的抖动动画 (Jolt) --- */
+@keyframes alert-jolt {
+    0% { transform: translate(0,0); filter: hue-rotate(0deg); }
+    25% { transform: translate(-3px, 1.5px); }
+    50% { transform: translate(3px, -1.5px); filter: brightness(2); }
+    75% { transform: translate(-3px, -1.5px); }
+    100% { transform: translate(0,0); }
+}
+
+.btn-alert {
+    background: rgba(125, 211, 252, 0.3) !important;
+    border-color: #7dd3fc !important;
+    box-shadow: 0 0 40px #7dd3fc, inset 0 0 20px #7dd3fc !important;
+    animation: alert-jolt 0.12s linear infinite !important; /* 极高频抖动 */
+    color: #fff !important;
+}
 /* 底部控制栏 */
 .bottom-bar {
     bottom: 0; 
