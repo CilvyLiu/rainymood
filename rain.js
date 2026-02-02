@@ -217,19 +217,19 @@
     const dt = Math.min((now - this.lastTime) / 1000, 0.033);
     this.lastTime = now;
 
-    // 1. 生成雨滴逻辑 (考虑到风，让雨滴有概率从屏幕左侧飘入)
+    // 1. 生成雨滴
     if (Math.random() < this.spawnChance) {
         const range = this.sizeRange || [12, 55];
         const randomSize = Math.random() * (range[1] - range[0]) + range[0];
-        // 增加生成范围，防止右侧风大时出现空白区
-        const xPos = Math.random() * (this.waterCanvas.width + 400 * this.ratio) - 200 * this.ratio;
+        // 考虑到风，雨滴生成位置要偏移，防止逆风处秃顶
+        const xPos = Math.random() * (this.waterCanvas.width + 600 * this.ratio) - 300 * this.ratio;
         this.drops.push(new RainDrop(xPos, -100, randomSize, this.ratio, this));
     }
 
     const ctx = this.waterCtx;
     ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
-    // 2. 残留水迹逻辑 (让“尾巴”顺着风向撕裂)
+    // 2. 残留水迹逻辑 (受风力撕裂的斜长线)
     for (let i = this.staticDrops.length - 1; i >= 0; i--) {
         let s = this.staticDrops[i];
         s.r -= dt * (this.fadeSpeed || 2.5); 
@@ -238,58 +238,63 @@
         ctx.save();
         ctx.translate(s.x, s.y);
         
-        // 如果没有初始化角度和拉伸，赋予它物理特性
-        if(!s.angle) {
-            // 这里的 angle 应该继承自产生它的主雨滴
-            s.angle = s.initialAngle || 0.4; 
-            s.scaleX = 0.6 + Math.random() * 0.4;
-            s.scaleY = 1.5 + Math.random() * 2.0; // 重点：让残留物纵向撕裂，不再圆滚滚
+        // 物理特性：受风影响的残留物应该是“斜切”的
+        if(!s.isSetup) {
+            s.angle = s.initialAngle || 0;
+            // 风越大，拖尾被撕扯得越细长
+            s.skew = Math.tan(s.angle) * 0.5; 
+            s.scaleY = 1.2 + Math.random() * 2.0; 
+            s.isSetup = true;
         }
         
+        // 使用 transform 实现物理上的“切变”效果，比旋转更真实
+        ctx.transform(1, 0, s.skew, 1, 0, 0); 
         ctx.rotate(s.angle);
-        ctx.globalAlpha = Math.min(1.0, s.r / 3.0); // 边缘更柔和
-        ctx.drawImage(this.dropShape, -s.r * s.scaleX, -s.r * s.scaleY, s.r * 2 * s.scaleX, s.r * 2 * s.scaleY);
+        ctx.globalAlpha = Math.min(1.0, s.r / 2.0);
+        ctx.drawImage(this.dropShape, -s.r, -s.r * s.scaleY, s.r * 2, s.r * 2 * s.scaleY);
         ctx.restore();
     }
 
-    // 3. 主雨滴滑落逻辑 (飘逸风效果 + 轨迹撕裂)
+    // 3. 主雨滴滑落逻辑 (动态形变)
     for (let i = this.drops.length - 1; i >= 0; i--) {
         let d = this.drops[i];
         
-        // d.update 内部现在应该已经有了 vx, vy 的逻辑
         if (d.update(dt, this.waterCanvas.height)) {
-            d.r *= 0.96; // 产生拖尾会导致主滴水量损耗
+            d.r *= 0.96; 
+            const dropAngle = Math.atan2(d.vx, d.vy); // 计算横向风力导致的偏角
 
-            // 【撕裂拖尾】：根据当前 vx 和 vy 计算滑行角度
-            const dropAngle = Math.atan2(d.vy, d.vx) - Math.PI/2;
-            
+            // 存入残留水痕，继承当前的角度
             this.staticDrops.push({ 
-                x: d.x + (Math.random() - 0.5) * 4, 
+                x: d.x, 
                 y: d.y, 
-                r: d.r * (Math.random() * 0.3 + 0.2),
-                initialAngle: dropAngle // 记录产生瞬间的角度，让尾巴斜着躺下
+                r: d.r * (Math.random() * 0.2 + 0.15),
+                initialAngle: dropAngle 
             });
         }
         
         if (d.terminated || d.r < 1.5) { this.drops.splice(i, 1); continue; }
         
-        // 【飘逸视觉】：计算实时的倾斜角度和拉伸倍率
-        const velocityTotal = Math.sqrt(d.vx * d.vx + d.vy * d.vy) || d.velocity;
-        const moveAngle = Math.atan2(d.vy, d.vx) - Math.PI/2;
-        const stretch = 1.5 + (velocityTotal / 1500);
+        // 形状受风影响：速度越快，偏角越大，拉伸越厉害
+        const speed = Math.sqrt(d.vx * d.vx + d.vy * d.vy);
+        const angle = Math.atan2(d.vx, d.vy); 
+        const stretch = 1.4 + (speed / 1200);
 
         ctx.save();
         ctx.translate(d.x, d.y);
-        ctx.rotate(moveAngle); // 顺着风向倾斜
         
-        const w = d.r * 2 * (0.8 + Math.random() * 0.4); // 模拟空气阻力导致的形态抖动
+        // 物理切变：模拟水滴在风中被吹得一边大一边小
+        const skew = Math.sin(angle) * 0.3;
+        ctx.transform(1, 0, skew, 1, 0, 0);
+        ctx.rotate(-angle); 
+
+        const w = d.r * 2 * (0.9 + Math.random() * 0.2);
         const h = d.r * 2 * stretch;
         
         ctx.drawImage(this.dropShape, -w / 2, -h / 2, w, h);
         ctx.restore();
     }
 
-    // 4. WebGL 渲染层
+    // 4. WebGL 渲染 (保持不变)
     if (!this.backgroundLoaded) return requestAnimationFrame(t => this.loop(t));
     const gl = this.gl;
     gl.useProgram(this.prog);
