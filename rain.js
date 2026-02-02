@@ -10,59 +10,66 @@
     };
 
     class RainDrop {
-        constructor(x, y, size, ratio, engine) {
-            this.engine = engine;
-            this.x = x;
-            this.y = y;
-            this.r = size * ratio;
-            this.vy = 0;
-            this.vx = 0;
-            this.terminated = false;
-            this.lastTrailY = y;
-            this.lastTrailX = x;
-            
-            // --- 核心修改：打破统一规律 ---
-            // 1. 敏感度随机：有的雨滴受风影响大，有的几乎垂直掉落
-            this.windSensitivity = Math.random() * 0.8 + 0.4; 
-            // 2. 初始相位随机：让正弦波动的起始点分散开
-            this.phase = Math.random() * Math.PI * 2; 
-            // 3. 自有频率随机：让每滴雨晃动的快慢不一
-            this.oscFreq = Math.random() * 0.02 + 0.01;
-            
-            this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
+    constructor(x, y, size, ratio, engine) {
+        this.engine = engine;
+        this.x = x;
+        this.y = y;
+        this.r = size * ratio;
+        this.vy = 0;
+        this.vx = 0;
+        this.terminated = false;
+        
+        // --- 表面张力与空气动力学参数 ---
+        // 质量越大，受重力影响越直接，受风力偏转越小
+        this.mass = this.r * 1.5; 
+        this.windSensitivity = (1 / this.r) * 0.5 + 0.3; // 小雨滴更随风飘荡
+        
+        // 初始物理状态
+        this.phase = Math.random() * Math.PI * 2;
+        this.oscFreq = 0.01 + (Math.random() * 0.01);
+        
+        // 轨迹距离受质量影响（表面张力滞后效应）
+        this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
+        this.lastTrailY = y;
+        this.lastTrailX = x;
+    }
+
+    update(dt, height, time) {
+        const currentGravity = this.engine.customGravity || CONFIG.gravity;
+
+        // 1. 模拟自然波动阵风 (Noise-like Wind)
+        let windBase = Math.sin(time * 0.0008) * 250 + 
+                       Math.sin(time * 0.002) * 120 + 
+                       (Math.random() - 0.5) * 50; // 细微湍流
+
+        const windAccel = windBase * this.windSensitivity;
+
+        // 2. 模拟终端速度 (Terminal Velocity)
+        // 物理公式：重力减去空气阻力 (阻力与速度平方成正比)
+        // 这里的 0.0005 是空气阻力系数，由表面张力/截面积决定
+        const airResistance = 0.0005 * (this.vy * this.vy);
+        const netGravity = currentGravity - airResistance;
+
+        this.vy += netGravity * dt;
+        this.vx += (windAccel - this.vx * 0.5) * dt; // 风阻衰减
+
+        // 3. 整合重力与表面张力带来的轨迹晃动
+        this.y += this.vy * dt;
+        // 侧向位移：风力 + 表面张力造成的微小摆动
+        this.x += this.vx * dt + Math.sin(this.y * this.oscFreq + this.phase) * (this.r * 0.2);
+
+        // 4. 判断是否生成拖尾
+        const distMoved = Math.hypot(this.y - this.lastTrailY, this.x - this.lastTrailX);
+        if (distMoved > this.nextTrailDist) {
+            this.lastTrailY = this.y;
+            this.lastTrailX = this.x;
+            return true;
         }
 
-        update(dt, height, time) { // 注意这里多传了一个 time 参数
-            const currentGravity = this.engine.customGravity || CONFIG.gravity;
-            
-            // --- 核心修改：模拟不规则阵风 ---
-            // 叠加三个不同频率的波，模拟自然界中飘忽不定的风
-            let windBase = Math.sin(time * 0.001) * 200 + 
-                           Math.sin(time * 0.00317) * 100 + 
-                           Math.sin(time * 0.0005) * 150;
-            
-            if (this.engine.spawnChance > 0.5) windBase *= 1.5; 
-            
-            const windAccel = windBase * this.windSensitivity;
-            const friction = 0.004 * this.r; 
-            
-            this.vy += (currentGravity - (this.vy * friction)) * dt;
-            this.vx += (windAccel - (this.vx * friction)) * dt;
-
-            this.y += this.vy * dt;
-            // 这里的波动不再是全局统一的，而是受个体 phase 和 oscFreq 影响
-            this.x += this.vx * dt + Math.sin(this.y * this.oscFreq + this.phase) * 0.8;
-
-            const distMoved = Math.sqrt(Math.pow(this.y - this.lastTrailY, 2) + Math.pow(this.x - this.lastTrailX, 2));
-            if (distMoved > this.nextTrailDist) {
-                this.lastTrailY = this.y;
-                this.lastTrailX = this.x;
-                return true;
-            }
-            if (this.y > height + 100) this.terminated = true;
-            return false;
-        }        
+        if (this.y > height + 100) this.terminated = true;
+        return false;
     }
+}
 
     function RainRenderer(container) {
         this.container = container;
