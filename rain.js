@@ -1,29 +1,28 @@
 'use strict';
 
 (function() {
-    // 默认仿真参数
+    // 1. 量化参数微调：参考附件，增强折射感和可见度
     const CONFIG = {
         gravity: 2400,
         trailDistance: [20, 40],
-        refraction: 0.6,
-        alphaMultiply: 30.0,
-        alphaSubtract: 0.2
+        refraction: 0.7,        // 稍微调高折射
+        alphaMultiply: 50.0,    // 显著提高对比度，解决“看不见”
+        alphaSubtract: 0.15     // 降低剔除阈值
     };
 
     class RainDrop {
-        constructor(x, y, size, ratio, speedOffset) {
+        constructor(x, y, size, ratio, baseSpeed) {
             this.x = x;
             this.y = y;
             this.r = size * ratio;
             this.velocity = 0;
-            this.speedOffset = speedOffset; // 响应 HTML 中的 baseSpeed
             this.terminated = false;
             this.lastTrailY = y;
-            this.nextTrailDist = (Math.random() * 20 + 20) * ratio;
+            // 参考 simulator.ts 的 trailDistance 逻辑
+            this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
         }
 
         update(dt, height, baseSpeed) {
-            // 基础下落逻辑 + 响应 HTML 的速度设置
             const accel = CONFIG.gravity * (baseSpeed / 4); 
             this.velocity += accel * dt;
             this.y += (this.velocity + baseSpeed * 50) * dt;
@@ -41,14 +40,13 @@
         this.container = container;
         this.canvas = document.createElement('canvas');
         container.appendChild(this.canvas);
-        this.gl = this.canvas.getContext('webgl', { alpha: false, depth: false });
+        // 开启透明通道支持
+        this.gl = this.canvas.getContext('webgl', { alpha: true, depth: false });
         
         this.drops = [];
         this.staticDrops = [];
         this.lastTime = 0;
-        this.spawnTimer = 0;
 
-        // 【关键】对应 HTML 中的 weatherMap 字段
         this.options = {
             rainChance: 0.4,
             baseSpeed: 4 
@@ -67,21 +65,32 @@
             uniform float u_ref, u_aMult, u_aSub;
             void main() {
                 vec4 water = texture2D(u_water, v);
+                // 模拟附件中的折射偏移计算
                 vec2 offset = (water.rg - 0.5) * u_ref;
                 float alpha = clamp(water.a * u_aMult - u_aSub, 0.0, 1.0);
                 vec4 bg = texture2D(u_bg, v + offset);
-                gl_FragColor = mix(bg, bg + water.b * 0.2, alpha);
+                // 增加一点点水滴表面的高光亮度（来自 water.b）
+                gl_FragColor = mix(bg, bg + water.b * 0.15, alpha);
             }
         `;
 
         const prog = gl.createProgram();
-        const addShader = (t, s) => { const h = gl.createShader(t); gl.shaderSource(h, s); gl.compileShader(h); gl.attachShader(prog, h); };
+        const addShader = (t, s) => { 
+            const h = gl.createShader(t); 
+            gl.shaderSource(h, s); 
+            gl.compileShader(h); 
+            if (!gl.getShaderParameter(h, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(h));
+            gl.attachShader(prog, h); 
+        };
         addShader(gl.VERTEX_SHADER, vs); addShader(gl.FRAGMENT_SHADER, fs);
-        gl.linkProgram(prog); gl.useProgram(prog);
+        gl.linkProgram(prog); 
+        gl.useProgram(prog);
         this.prog = prog;
 
         this.texBg = gl.createTexture();
         this.texWater = gl.createTexture();
+        
+        // 内存中的离屏画布，模拟附件的 RenderBuffer
         this.waterCanvas = document.createElement('canvas');
         this.waterCtx = this.waterCanvas.getContext('2d');
         this.dropShape = this.createDropShape();
@@ -109,6 +118,7 @@
                 let i = (y * size + x) * 4;
                 if (dist <= 1.0) {
                     let f = Math.pow(1.0 - dist, 2);
+                    // R, G 存储法线偏移，B 存储高光强度，A 存储蒙版
                     img.data[i] = (dx * 0.5 + 0.5) * 255;
                     img.data[i+1] = (dy * 0.5 + 0.5) * 255;
                     img.data[i+2] = f * 255;
@@ -136,6 +146,7 @@
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.onload = () => {
+            gl.activeTexture(gl.TEXTURE0); // 背景强制锁定在 Slot 0
             gl.bindTexture(gl.TEXTURE_2D, this.texBg);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -149,40 +160,45 @@
         const dt = Math.min((now - this.lastTime) / 1000, 0.033);
         this.lastTime = now;
 
-        // 响应 rainChance
-        if (Math.random() < this.options.rainChance * 0.1) {
-            const size = Math.random() * 20 + 15;
+        // 生成逻辑
+        if (Math.random() < this.options.rainChance * 0.15) {
+            const size = Math.random() * 25 + 15;
             this.drops.push(new RainDrop(Math.random() * this.waterCanvas.width, -100, size, this.ratio, this.options.baseSpeed));
         }
 
         const ctx = this.waterCtx;
         ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
-        // 绘制拖尾
+        // 绘制水痕
         for (let i = this.staticDrops.length - 1; i >= 0; i--) {
             let s = this.staticDrops[i];
-            s.r -= dt * 2.5; 
+            s.r -= dt * 3.0; 
             if (s.r < 1) { this.staticDrops.splice(i, 1); continue; }
             ctx.drawImage(this.dropShape, s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
         }
 
-        // 更新动态雨滴
+        // 更新并绘制动态雨滴
         for (let i = this.drops.length - 1; i >= 0; i--) {
             let d = this.drops[i];
             if (d.update(dt, this.waterCanvas.height, this.options.baseSpeed)) {
-                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.35 });
+                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.4 });
             }
             if (d.terminated) { this.drops.splice(i, 1); continue; }
             ctx.drawImage(this.dropShape, d.x - d.r * 0.8, d.y - d.r, d.r * 1.6, d.r * 3.5);
         }
 
         const gl = this.gl;
+        // 关键：将雨滴纹理上传至 Slot 1
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
         const loc = (n) => gl.getUniformLocation(this.prog, n);
-        gl.uniform1i(loc("u_water"), 1);
+        gl.uniform1i(loc("u_bg"), 0);    // 背景对应 TEXTURE0
+        gl.uniform1i(loc("u_water"), 1); // 雨滴对应 TEXTURE1
         gl.uniform1f(loc("u_ref"), CONFIG.refraction);
         gl.uniform1f(loc("u_aMult"), CONFIG.alphaMultiply);
         gl.uniform1f(loc("u_aSub"), CONFIG.alphaSubtract);
@@ -192,25 +208,26 @@
     };
 
     window.addEventListener('load', () => {
-    const container = document.getElementById('container');
-    if(!container) return;
-
-    // 1. 先初始化引擎
-    const renderer = new RainRenderer(container);
-    window.rainEngine = renderer;
-    
-    // 2. 核心修复：确保首张背景图加载后再启动
-    // 强制执行一次首屏加载
-    renderer.updateBackground('pensive.png'); 
-
-    // 3. 处理 Resize
-    window.addEventListener('resize', () => {
-        renderer.resize();
+        const container = document.getElementById('container');
+        if(!container) return;
+        const renderer = new RainRenderer(container);
+        window.rainEngine = renderer;
+        renderer.updateBackground('pensive.png');
+        window.addEventListener('resize', () => renderer.resize());
+        
+        // 初始同步一次天气
+        if (typeof changeWeather === 'function') changeWeather();
     });
 
-    // 4. 初始化天气状态（确保 HTML 默认值同步到引擎）
-    if(document.getElementById('weatherSelect')) {
-        changeWeather(); 
-    }
-});
+    // 暴露场景切换函数
+    window.changeScene = (url) => {
+        if(window.rainEngine) window.rainEngine.updateBackground(url);
+        const asc = document.getElementById('audio_scene');
+        if(asc) {
+            asc.src = url.split('.')[0] + '.mp3';
+            asc.play().catch(() => {});
+        }
+        const pbtn = document.getElementById('pbtn');
+        if(pbtn) pbtn.innerText = "⏸";
+    };
 })();
