@@ -3,10 +3,11 @@
 (function() {
     const CONFIG = {
         gravity: 1200,
-        trailDistance: [10, 35], // 缩短间距使痕迹更细腻
-        refraction: 0.5,
-        alphaMultiply: 20.0,
-        alphaSubtract: 0.1,
+        trailDistance: [10, 35],
+        refraction: 0.4,       // 稍微调低增加通透感
+        alphaMultiply: 18.0,
+        alphaSubtract: 0.2,
+        fogIntensity: 0.45,    // 水汽浓度
     };
 
     class RainDrop {
@@ -19,10 +20,7 @@
             this.vx = 0;
             this.terminated = false;
             
-            // 物理属性：小雨滴随风，大雨滴沉重
             this.windSensitivity = (1 / this.r) * 0.4 + 0.2; 
-            
-            // 轨迹逻辑：模拟玻璃表面的静摩擦力
             this.nextTrailDist = (Math.random() * 20 + 10) * ratio;
             this.lastTrailY = y;
             this.lastTrailX = x;
@@ -30,32 +28,25 @@
 
         update(dt, height, time) {
             const currentGravity = this.engine.customGravity || CONFIG.gravity;
-
-            // 1. 模拟阵风逻辑：长波低频 + 短波湍流
-            // 遵循一阵阵的规律，风速在 [-300, 600] 之间平滑波动
+            // 阵风物理量：低频长波波动
             const gust = Math.sin(time * 0.0004) * 350 + Math.sin(time * 0.0011) * 100;
             const windForce = gust * this.windSensitivity;
 
-            // 2. 模拟终端速度 (Terminal Velocity)
-            // mg = kv^2，当下落速度增加，空气阻力快速上升
+            // 阻力方程：F = mg - kv^2
             const terminalVelocity = 900 + this.r * 15;
-            const resistance = (this.vy / terminalVelocity);
-            const netAccel = currentGravity * (1 - resistance * resistance);
+            const netAccel = currentGravity * (1 - Math.pow(this.vy / terminalVelocity, 2));
 
             this.vy += netAccel * dt;
-            // 风速惯性衰减：雨滴不会瞬间改变方向，而是平滑转向
             this.vx += (windForce - this.vx * 0.8) * dt; 
 
-            // 3. 线性运动位移（移除波浪摆动，回归力学正确）
             this.y += this.vy * dt;
             this.x += this.vx * dt;
 
-            // 4. 模拟玻璃表面附着与破碎残迹
+            // 留痕判定：模拟表面张力的断裂
             const distMoved = Math.hypot(this.y - this.lastTrailY, this.x - this.lastTrailX);
             if (distMoved > this.nextTrailDist) {
                 this.lastTrailY = this.y;
                 this.lastTrailX = this.x;
-                // 玻璃表面不均匀，随机化下次留痕距离
                 this.nextTrailDist = (Math.random() * 25 + 5) * this.engine.ratio;
                 return true; 
             }
@@ -75,9 +66,9 @@
         this.lastTime = 0;
         this.backgroundLoaded = false;
         
-        this.spawnChance = 0.12; // 增加密度
+        this.spawnChance = 0.15; // 提高密度以产生更多洗刷路径
         this.sizeRange = [10, 30];
-        this.fadeSpeed = 1.8; // 残迹消失稍慢，增加氛围
+        this.fadeSpeed = 1.0;    // 洗刷后的痕迹消失（重新结雾）的速度
         this.ratio = window.devicePixelRatio || 1;
     }
 
@@ -87,7 +78,6 @@
         const h = window.innerHeight;
         this.canvas.width = w * this.ratio;
         this.canvas.height = h * this.ratio;
-        
         if (!this.waterCanvas) {
             this.waterCanvas = document.createElement('canvas');
             this.waterCtx = this.waterCanvas.getContext('2d');
@@ -103,23 +93,19 @@
         canvas.width = canvas.height = size;
         const ctx = canvas.getContext('2d');
         const img = ctx.createImageData(size, size);
-        
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
                 let dx = (x - 32) / 32;
                 let dy = (y - 32) / 32;
-                
-                // 物理仿真：受重力拉扯，重心下移的馒头形 (dy > 0 时 dist 增加慢)
-                let dist = Math.sqrt(dx * dx * 1.0 + dy * dy * (dy > 0 ? 0.85 : 1.2)); 
-                
+                // 力学形态：重力形变馒头状
+                let dist = Math.sqrt(dx * dx + dy * dy * (dy > 0 ? 0.8 : 1.25)); 
                 let i = (y * size + x) * 4;
                 if (dist <= 0.8) {
                     let f = Math.pow(1.0 - dist / 0.8, 1.5);
-                    // R, G 存储法线图信息：模拟平凸透镜折射
                     img.data[i] = (dx * 0.7 + 0.5) * 255;   
                     img.data[i+1] = (dy * 0.7 + 0.5) * 255; 
-                    img.data[i+2] = f * 255; // 高光亮度               
-                    img.data[i+3] = f * 255; // 遮罩
+                    img.data[i+2] = f * 255;               
+                    img.data[i+3] = f * 255;               
                 }
             }
         }
@@ -137,18 +123,27 @@
             precision mediump float;
             uniform sampler2D u_bg, u_water;
             uniform vec2 u_res, u_bgRes;
-            uniform float u_ref, u_aMult, u_aSub;
+            uniform float u_ref, u_aMult, u_aSub, u_fog;
             varying vec2 v;
             void main() {
                 vec2 s = u_res / u_bgRes;
                 float scale = max(s.x, s.y);
                 vec2 uv = (v - 0.5) * (s / scale) + 0.5;
+                
                 vec4 water = texture2D(u_water, v);
                 vec2 offset = (water.rg - 0.5) * u_ref * water.b;
+                
+                // 物理仿真：基础背景 + 水汽色散
                 vec4 bg = texture2D(u_bg, uv + offset);
-                float alpha = clamp(water.a * u_aMult - u_aSub, 0.0, 1.0);
-                // 增加高光部分的对比度，增强质感
-                gl_FragColor = mix(bg, bg + pow(water.b, 2.5) * 0.4, alpha);
+                vec3 fogColor = vec3(0.85, 0.9, 0.95); 
+                
+                // 水汽算法：water.a 控制透明路径（洗刷效果）
+                // 这里的 u_fog 是基础雾量，water.a 会将其抠开
+                float fog = u_fog * (1.0 - clamp(water.a * u_aMult, 0.0, 1.0));
+                vec3 finalColor = mix(bg.rgb, fogColor, fog);
+                
+                // 叠加高光：pow 增加亮点的锐利感
+                gl_FragColor = vec4(finalColor + pow(water.b, 2.8) * 0.4, 1.0);
             }
         `;
 
@@ -167,7 +162,6 @@
 
         this.texBg = gl.createTexture();
         this.texWater = gl.createTexture();
-
         gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
         const p = gl.getAttribLocation(prog, 'p');
@@ -187,8 +181,6 @@
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             this.bgImage = img;
             this.backgroundLoaded = true;
         };
@@ -205,15 +197,21 @@
         }
 
         const ctx = this.waterCtx;
-        ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
+        
+        // --- 洗刷逻辑核心 ---
+        // 我们不使用 clearRect，而是用带透明度的 fillRect
+        // 这样滑过的痕迹（Alpha > 0）会随时间慢慢被覆盖（重新结雾）
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = `rgba(255, 255, 255, ${this.fadeSpeed * dt})`; 
+        ctx.fillRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
+        ctx.globalCompositeOperation = 'source-over';
 
         [this.staticDrops, this.drops].forEach((list, idx) => {
             for (let i = list.length - 1; i >= 0; i--) {
                 let d = list[i];
-                if (idx === 0) d.r -= dt * this.fadeSpeed;
+                if (idx === 0) d.r -= dt * 2.0; // 静态留痕干涸更快
                 else if (d.update(dt, this.waterCanvas.height, now)) {
-                    // 只有运动中的雨滴留下“破碎”的静止残迹
-                    this.staticDrops.push({ x: d.x, y: d.y, r: d.r * (Math.random() * 0.2 + 0.3), terminated: false });
+                    this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.45, terminated: false });
                 }
                 
                 if (d.terminated || d.r < 0.5) { list.splice(i, 1); continue; }
@@ -223,12 +221,11 @@
                 if (idx === 1) {
                     const angle = Math.atan2(d.vy, d.vx);
                     ctx.rotate(angle - Math.PI / 2);
-                    // 仅在大速度下产生极其轻微的纵向拉伸，保持球极形态
                     const speed = Math.sqrt(d.vx * d.vx + d.vy * d.vy);
-                    const stretch = Math.min(speed * 0.03, d.r * 0.5);
+                    const stretch = Math.min(speed * 0.02, d.r * 0.4); // 极度克制的拉伸
                     ctx.drawImage(this.dropShape, -d.r, -d.r, d.r * 2, (d.r + stretch) * 2);
                 } else {
-                    ctx.globalAlpha = 0.5; // 静态残迹更透明
+                    ctx.globalAlpha = 0.5;
                     ctx.drawImage(this.dropShape, -d.r, -d.r, d.r * 2, d.r * 2);
                 }
                 ctx.restore();
@@ -242,8 +239,6 @@
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.texBg);
@@ -256,6 +251,7 @@
         gl.uniform1f(loc("u_ref"), CONFIG.refraction);
         gl.uniform1f(loc("u_aMult"), CONFIG.alphaMultiply);
         gl.uniform1f(loc("u_aSub"), CONFIG.alphaSubtract);
+        gl.uniform1f(loc("u_fog"), CONFIG.fogIntensity);
 
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         requestAnimationFrame(t => this.loop(t));
