@@ -3,7 +3,7 @@
 (function() {
     const CONFIG = {
         gravity: 1200,
-        trailDistance: [15, 45],
+        trailDistance: [10, 35], // 缩短间距使痕迹更细腻
         refraction: 0.5,
         alphaMultiply: 20.0,
         alphaSubtract: 0.1,
@@ -18,33 +18,46 @@
             this.vy = 0;
             this.vx = 0;
             this.terminated = false;
-            this.mass = this.r * 1.5; 
-            this.windSensitivity = (1 / this.r) * 0.5 + 0.3; 
-            this.phase = Math.random() * Math.PI * 2;
-            this.oscFreq = 0.01 + (Math.random() * 0.01);
-            this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
+            
+            // 物理属性：小雨滴随风，大雨滴沉重
+            this.windSensitivity = (1 / this.r) * 0.4 + 0.2; 
+            
+            // 轨迹逻辑：模拟玻璃表面的静摩擦力
+            this.nextTrailDist = (Math.random() * 20 + 10) * ratio;
             this.lastTrailY = y;
             this.lastTrailX = x;
         }
 
         update(dt, height, time) {
             const currentGravity = this.engine.customGravity || CONFIG.gravity;
-            let windBase = Math.sin(time * 0.0008) * 250 + Math.sin(time * 0.002) * 120;
-            const windAccel = windBase * this.windSensitivity;
-            const airResistance = 0.0005 * (this.vy * this.vy);
-            const netGravity = currentGravity - airResistance;
 
-            this.vy += netGravity * dt;
-            this.vx += (windAccel - this.vx * 0.5) * dt;
+            // 1. 模拟阵风逻辑：长波低频 + 短波湍流
+            // 遵循一阵阵的规律，风速在 [-300, 600] 之间平滑波动
+            const gust = Math.sin(time * 0.0004) * 350 + Math.sin(time * 0.0011) * 100;
+            const windForce = gust * this.windSensitivity;
 
+            // 2. 模拟终端速度 (Terminal Velocity)
+            // mg = kv^2，当下落速度增加，空气阻力快速上升
+            const terminalVelocity = 900 + this.r * 15;
+            const resistance = (this.vy / terminalVelocity);
+            const netAccel = currentGravity * (1 - resistance * resistance);
+
+            this.vy += netAccel * dt;
+            // 风速惯性衰减：雨滴不会瞬间改变方向，而是平滑转向
+            this.vx += (windForce - this.vx * 0.8) * dt; 
+
+            // 3. 线性运动位移（移除波浪摆动，回归力学正确）
             this.y += this.vy * dt;
-            this.x += this.vx * dt + Math.sin(this.y * this.oscFreq + this.phase) * (this.r * 0.2);
+            this.x += this.vx * dt;
 
+            // 4. 模拟玻璃表面附着与破碎残迹
             const distMoved = Math.hypot(this.y - this.lastTrailY, this.x - this.lastTrailX);
             if (distMoved > this.nextTrailDist) {
                 this.lastTrailY = this.y;
                 this.lastTrailX = this.x;
-                return true;
+                // 玻璃表面不均匀，随机化下次留痕距离
+                this.nextTrailDist = (Math.random() * 25 + 5) * this.engine.ratio;
+                return true; 
             }
 
             if (this.y > height + 100) this.terminated = true;
@@ -52,7 +65,6 @@
         }
     }
 
-    // --- 1. 构造函数声明 ---
     function RainRenderer(container) {
         this.container = container;
         this.canvas = document.createElement('canvas');
@@ -62,15 +74,13 @@
         this.staticDrops = [];
         this.lastTime = 0;
         this.backgroundLoaded = false;
-        this.spawnChance = 0.08;
-        this.sizeRange = [12, 35];
-        this.fadeSpeed = 2.5;
-        this.customGravity = 1200;
         
-        // 关键点：不再构造函数里直接调 init，防止 prototype 方法未加载
+        this.spawnChance = 0.12; // 增加密度
+        this.sizeRange = [10, 30];
+        this.fadeSpeed = 1.8; // 残迹消失稍慢，增加氛围
+        this.ratio = window.devicePixelRatio || 1;
     }
 
-    // --- 2. 挂载原型方法 ---
     RainRenderer.prototype.resize = function() {
         this.ratio = window.devicePixelRatio || 1;
         const w = window.innerWidth;
@@ -82,8 +92,8 @@
             this.waterCanvas = document.createElement('canvas');
             this.waterCtx = this.waterCanvas.getContext('2d');
         }
-        this.waterCanvas.width = w * this.ratio;
-        this.waterCanvas.height = h * this.ratio;
+        this.waterCanvas.width = this.canvas.width;
+        this.waterCanvas.height = this.canvas.height;
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     };
 
@@ -93,18 +103,23 @@
         canvas.width = canvas.height = size;
         const ctx = canvas.getContext('2d');
         const img = ctx.createImageData(size, size);
+        
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
                 let dx = (x - 32) / 32;
                 let dy = (y - 32) / 32;
-                let dist = Math.sqrt(dx * dx * 1.1 + dy * dy * (dy > 0 ? 0.8 : 1.3));
+                
+                // 物理仿真：受重力拉扯，重心下移的馒头形 (dy > 0 时 dist 增加慢)
+                let dist = Math.sqrt(dx * dx * 1.0 + dy * dy * (dy > 0 ? 0.85 : 1.2)); 
+                
                 let i = (y * size + x) * 4;
-                if (dist <= 1.0) {
-                    let f = Math.pow(1.0 - dist, 1.2);
-                    img.data[i] = (dx * 0.5 + 0.5) * 255;
-                    img.data[i+1] = (dy * 0.5 + 0.5) * 255;
-                    img.data[i+2] = f * 255;
-                    img.data[i+3] = f * 255;
+                if (dist <= 0.8) {
+                    let f = Math.pow(1.0 - dist / 0.8, 1.5);
+                    // R, G 存储法线图信息：模拟平凸透镜折射
+                    img.data[i] = (dx * 0.7 + 0.5) * 255;   
+                    img.data[i+1] = (dy * 0.7 + 0.5) * 255; 
+                    img.data[i+2] = f * 255; // 高光亮度               
+                    img.data[i+3] = f * 255; // 遮罩
                 }
             }
         }
@@ -113,10 +128,10 @@
     };
 
     RainRenderer.prototype.init = function() {
-        const gl = this.gl;
-        this.resize(); // 此时 prototype 已经挂载，不会报错
+        this.resize();
         this.dropShape = this.createDropShape();
-
+        const gl = this.gl;
+        
         const vs = `attribute vec2 p;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=p*0.5+0.5;v.y=1.0-v.y;}`;
         const fs = `
             precision mediump float;
@@ -132,7 +147,8 @@
                 vec2 offset = (water.rg - 0.5) * u_ref * water.b;
                 vec4 bg = texture2D(u_bg, uv + offset);
                 float alpha = clamp(water.a * u_aMult - u_aSub, 0.0, 1.0);
-                gl_FragColor = mix(bg, bg + pow(water.b, 3.0) * 0.3, alpha);
+                // 增加高光部分的对比度，增强质感
+                gl_FragColor = mix(bg, bg + pow(water.b, 2.5) * 0.4, alpha);
             }
         `;
 
@@ -196,7 +212,8 @@
                 let d = list[i];
                 if (idx === 0) d.r -= dt * this.fadeSpeed;
                 else if (d.update(dt, this.waterCanvas.height, now)) {
-                    this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.45, terminated: false });
+                    // 只有运动中的雨滴留下“破碎”的静止残迹
+                    this.staticDrops.push({ x: d.x, y: d.y, r: d.r * (Math.random() * 0.2 + 0.3), terminated: false });
                 }
                 
                 if (d.terminated || d.r < 0.5) { list.splice(i, 1); continue; }
@@ -206,11 +223,12 @@
                 if (idx === 1) {
                     const angle = Math.atan2(d.vy, d.vx);
                     ctx.rotate(angle - Math.PI / 2);
+                    // 仅在大速度下产生极其轻微的纵向拉伸，保持球极形态
                     const speed = Math.sqrt(d.vx * d.vx + d.vy * d.vy);
-                    const stretch = Math.min(speed * 0.05, d.r * 2);
+                    const stretch = Math.min(speed * 0.03, d.r * 0.5);
                     ctx.drawImage(this.dropShape, -d.r, -d.r, d.r * 2, (d.r + stretch) * 2);
                 } else {
-                    ctx.globalAlpha = 0.6;
+                    ctx.globalAlpha = 0.5; // 静态残迹更透明
                     ctx.drawImage(this.dropShape, -d.r, -d.r, d.r * 2, d.r * 2);
                 }
                 ctx.restore();
@@ -243,11 +261,10 @@
         requestAnimationFrame(t => this.loop(t));
     };
 
-    // --- 3. 统一入口 ---
     window.addEventListener('load', () => {
         const renderer = new RainRenderer(document.getElementById('container'));
         window.rainEngine = renderer;
-        renderer.init(); // 此时所有 prototype 方法均已挂载完成
+        renderer.init();
     });
 
     window.addEventListener('resize', () => {
