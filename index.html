@@ -70,66 +70,79 @@
         const asc = document.getElementById('audio_scene');
         const pbtn = document.getElementById('pbtn');
 
-        // 核心修复：点击页面任意位置启动音频
+        // --- 联动映射表 ---
+        const SCENE_ASSETS = {
+            'pensive.png':  { audio: 'train.mp3' },
+            'train.png':    { audio: 'window_rain.mp3' },
+            'window.png':   { audio: 'camp.mp3' },
+            'beach.png':    { audio: 'ocean.mp3' },
+            'mountain.png': { audio: 'zen.mp3' }
+        };
+
         function initAudio() {
             if (abg.paused) {
                 abg.play().catch(() => {});
                 if (asc.src) asc.play().catch(() => {});
                 pbtn.innerText = "⏸";
             }
-            // 激活后移除，防止干扰其他点击
             document.body.onclick = null;
         }
 
-        // 播放按钮手动切换
         window.toggleAudio = function(e) {
             e.stopPropagation();
             if (abg.paused) {
-                abg.play();
-                if (asc.src) asc.play();
+                abg.play(); if (asc.src) asc.play();
                 pbtn.innerText = "⏸";
             } else {
-                abg.pause();
-                asc.pause();
+                abg.pause(); asc.pause();
                 pbtn.innerText = "▶";
             }
         };
 
-        // 同步音量
         function sync() { 
             const v = document.getElementById('vol').value;
             abg.volume = asc.volume = v; 
         }
 
-        // 联动 rain.js 的天气控制
-        function changeWeather() {
+        // 场景切换逻辑
+        window.changeScene = function(val) {
+            if (window.rainEngine) {
+                window.rainEngine.updateBackground(val);
+                const asset = SCENE_ASSETS[val];
+                if (asset) {
+                    asc.src = asset.audio;
+                    asc.play().catch(() => {});
+                }
+            }
+        };
+
+        // 天气联动逻辑
+        window.changeWeather = function() {
             const weather = document.getElementById('weatherSelect').value;
             if (window.rainEngine) {
                 const weatherMap = {
-                    rain: { chance: 0.4, speed: 4 },
-                    storm: { chance: 0.8, speed: 10 },
-                    drizzle: { chance: 0.15, speed: 2 },
-                    sunny: { chance: 0, speed: 0 }
+                    rain:    { chance: 0.3, size: [30, 60] },
+                    storm:   { chance: 0.8, size: [60, 110] },
+                    drizzle: { chance: 0.1, size: [15, 35] },
+                    sunny:   { chance: 0,   size: [0, 0] }
                 };
                 const opt = weatherMap[weather];
-                window.rainEngine.options.rainChance = opt.chance;
-                window.rainEngine.options.baseSpeed = opt.speed; 
+                // 关键：将参数注入到 window.rainEngine
+                window.rainEngine.spawnChance = opt.chance;
+                window.rainEngine.sizeRange = opt.size;
             }
-        }
+        };
 
-        // UI 交互
         function toggleRules(e) {
             e.stopPropagation();
             const card = document.getElementById('mainRule');
             card.style.display = (card.style.display === 'none') ? 'block' : 'none';
         }
 
-        // 时钟系统
         function updateClock() {
             document.getElementById('clock').innerText = new Date().toLocaleTimeString('zh-CN', {hour12: false});
         }
 
-        // 启动任务
         setInterval(updateClock, 1000);
         updateClock();
         sync();
