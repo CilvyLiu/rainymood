@@ -194,19 +194,20 @@
         window.rainEngine = renderer;
         
         window.addEventListener('resize', () => renderer.resize());
-
-        // 场景切换逻辑
+        // 场景切换
         window.changeScene = (url) => {
-            renderer.updateBackground(url);
-            const asc = document.getElementById('audio_scene');
-            if(!asc) return;
-            if(url === 'pensive.png') {
-                asc.pause();
-            } else {
-                // 确保音频路径与场景名对应
-                asc.src = url.split('.')[0] + '.mp3';
-                asc.play().catch(() => {});
-            }
-        };
+    renderer.updateBackground(url);
+    const asc = document.getElementById('audio_scene');
+    if(!asc) return;
+    
+    // 自动匹配：pensive.png -> pensive.mp3
+    const audioSrc = url.split('.')[0] + '.mp3'; 
+    asc.src = audioSrc;
+    asc.play().catch(() => console.log("等待交互后播放"));
+    
+    // 确保播放按钮状态同步
+    const pbtn = document.getElementById('pbtn');
+    pbtn.innerText = "⏸";
+};
     });
 })();
