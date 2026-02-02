@@ -127,15 +127,32 @@
         canvas.width = canvas.height = size;
         const ctx = canvas.getContext('2d');
         const img = ctx.createImageData(size, size);
+        
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                let dx = (x - 32)/32, dy = (y - 32)/32;
-                let dist = Math.sqrt(dx*dx + dy*dy);
+                // 1. 归一化坐标 (-1 到 1)
+                let dx = (x - 32) / 32;
+                let dy = (y - 32) / 32;
+
+                // 2. 物理模拟：梨形偏移
+                // 通过修改 dy，让下半部分（dy > 0）比上半部分更饱满
+                // 模拟重力导致水珠重心下移
+                let dropShape = dy > 0 ? dy * 0.8 : dy * 1.2; 
+                
+                // 3. 纵向拉伸因子
+                // 这里的 0.9 让宽度收缩，使其看起来略微椭圆
+                let dist = Math.sqrt(dx * dx / 0.9 + dropShape * dropShape);
+
                 let i = (y * size + x) * 4;
                 if (dist <= 1.0) {
+                    // 4. 边缘平滑与折射强度
                     let f = Math.pow(1.0 - dist, 2);
+                    
+                    // RG 通道控制折射偏移（由原本的中心对称改为略微向下偏移）
                     img.data[i] = (dx * 0.5 + 0.5) * 255;   
-                    img.data[i+1] = (dy * 0.5 + 0.5) * 255; 
+                    img.data[i+1] = (dy * 0.3 + 0.7) * 255; // Y方向折射偏移向下倾斜
+                    
+                    // B 通道控制高光强度，A 通道控制透明度
                     img.data[i+2] = f * 255;               
                     img.data[i+3] = f * 255;               
                 }
@@ -195,8 +212,25 @@
 
         for (let i = this.drops.length - 1; i >= 0; i--) {
             let d = this.drops[i];
+            
+            // 1. 核心更新逻辑
+            // d.update 返回 true 表示达到了 trailDistance，该留下一滴残留水珠了
             if (d.update(dt, this.waterCanvas.height)) {
-                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.2 });
+                
+                // 【物理改动 A】：由于主雨滴留下了残留水珠，它自身的体积（半径）应该轻微缩小
+                // 模拟“水量损耗”，这样雨滴滑到后面会变小变快
+                d.r *= 0.98; 
+        
+                // 【物理改动 B】：残留水珠（StaticDrops）的随机化
+                // 以前是固定的 0.2 倍。现在让它在 0.3 到 0.6 之间随机。
+                // 体积较大的水珠会让梨形效果在视觉上更明显。
+                const staticR = d.r * (Math.random() * 0.3 + 0.3);
+                
+                this.staticDrops.push({ 
+                    x: d.x + (Math.random() - 0.5) * 2, // 增加微小的位置偏移，打破直线感
+                    y: d.y, 
+                    r: staticR 
+                });
             }
             if (d.terminated) { this.drops.splice(i, 1); continue; }
             
