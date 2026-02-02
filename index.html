@@ -159,25 +159,26 @@
             }
         };
 
-        /* --- 找到这一段 --- */
-           function toggleRules(e) {
-                e.stopPropagation();
-                const card = document.getElementById('mainRule');
-                const isHidden = card.style.display === 'none' || card.style.display === '';
-                
-                if (isHidden) {
-                    card.style.display = 'block';
-                    // 1. 强制重置动画
-                    card.style.animation = 'none';
-                    card.offsetHeight; // 触发 reflow
-                    // 2. 重新应用组合动画：入场(0.6s) + 呼吸(8s 无限循环)
-                    // 确保这里的动画名称与 CSS 中 @keyframes 一致
-                    card.style.animation = 'fadeInBlur 0.6s ease-out forwards, breathing 8s ease-in-out 0.6s infinite'; 
-                } else {
-                    card.style.display = 'none';
-                    card.style.animation = 'none';
-                }
+       
+         /* --- 找到 index.html 里的这一段并替换 --- */
+        function toggleRules(e) {
+            e.stopPropagation();
+            const card = document.getElementById('mainRule');
+            const isHidden = card.style.display === 'none' || card.style.display === '';
+            
+            if (isHidden) {
+                card.style.display = 'block';
+                // 1. 强制重置动画状态
+                card.style.animation = 'none';
+                // 2. 触发重绘（这是关键，不写这个浏览器就不动）
+                card.offsetHeight; 
+                // 3. 重新注入复合动画：先入场，再呼吸
+                card.style.animation = 'fadeInBlur 0.8s ease-out forwards, breathing 10s ease-in-out 0.8s infinite';
+            } else {
+                card.style.display = 'none';
+                card.style.animation = 'none';
             }
+        }
         function updateClock() {
             document.getElementById('clock').innerText = new Date().toLocaleTimeString('zh-CN', {hour12: false});
         }
