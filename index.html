@@ -160,7 +160,7 @@
         };
 
        
-         /* --- 找到 index.html 里的这一段并替换 --- */
+        /* --- 已修正：冥想呼吸按钮逻辑 --- */
         document.getElementById('focusBtn').addEventListener('click', function(e) {
             e.stopPropagation();
             const card = document.getElementById('mainRule');
@@ -168,23 +168,22 @@
             const isHidden = card.style.display === 'none' || card.style.display === '';
             
             if (isHidden) {
-                // --- 开启：纪律降临 ---
+                // --- 开启：展现纪律，按钮恢复常态 ---
                 card.style.display = 'block';
                 card.style.animation = 'none';
                 void card.offsetWidth; 
-                // 使用你 CSS 里定义的 breathing 名字
                 card.style.animation = 'fadeInBlur 0.8s ease-out forwards, breathing 8s ease-in-out 0.8s infinite';
                 
-                btn.classList.remove('btn-alert');
+                btn.classList.remove('btn-alert'); // 移除呼吸灯类
                 btn.innerText = "FOCUS MODE";
             } else {
-                // --- 关闭：系统进入警觉 ---
+                // --- 关闭：维持冥想，按钮接力呼吸 ---
                 card.style.display = 'none';
                 card.style.animation = 'none';
                 
-                // 赋予按钮那个疯狂的抖动特效
+                // 激活呼吸灯特效（此时 CSS 中的 btn-alert 已被你改为慢速脉冲）
                 btn.classList.add('btn-alert');
-                btn.innerText = "SYSTEM ALERT";
+                btn.innerText = "BREATHE"; // 这里改成了“呼吸”，更有利于进入心流
             }
         });
         function updateClock() {
