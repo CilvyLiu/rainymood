@@ -167,15 +167,17 @@
             
             if (isHidden) {
                 card.style.display = 'block';
-                // 强制触发重绘，确保动画重新开始
+                // --- 核心校准：强制手动指定动画序列 ---
+                // 1. 先清空
                 card.style.animation = 'none';
+                // 2. 触发重绘 (Reflow)
                 card.offsetHeight; 
-                card.style.animation = null; 
+                // 3. 重新绑定：入场动画 0.6s + 呼吸动画 8s 无限循环
+                card.style.animation = 'fadeInBlur 0.6s ease-out forwards, breathing 8s ease-in-out 0.6s infinite'; 
             } else {
                 card.style.display = 'none';
             }
         }
-
         function updateClock() {
             document.getElementById('clock').innerText = new Date().toLocaleTimeString('zh-CN', {hour12: false});
         }
