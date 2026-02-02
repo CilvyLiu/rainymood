@@ -161,25 +161,28 @@
 
        
          /* --- 找到 index.html 里的这一段并替换 --- */
-        function toggleRules(e) {
+        // 用 ID 绑定，避开全局命名冲突
+        document.getElementById('focusBtn').addEventListener('click', function(e) {
             e.stopPropagation();
             const card = document.getElementById('mainRule');
             const isHidden = card.style.display === 'none' || card.style.display === '';
             
             if (isHidden) {
                 card.style.display = 'block';
-                // 关键：清除所有之前的动画状态
-                card.style.animation = 'none';
-                card.offsetHeight; // 强制重绘
                 
-                // 关键：手动拼接动画，确保 breathing 被排在后面且时间轴正确
-                // 我们给 breathing 一个更短的周期（6s），让你能更快看到效果
-                card.style.animation = 'fadeInBlur 0.8s ease-out forwards, breathing 6s ease-in-out 0.8s infinite';
+                // --- 核心：强制刷新并注入 ---
+                card.style.animation = 'none';
+                void card.offsetWidth; // 这一行是强迫浏览器“眨眼”重新看代码
+                
+                // 确保名字 breathing 对应你 CSS 里的 @keyframes
+                card.style.animation = 'fadeInBlur 0.8s ease-out forwards, breathing 8s ease-in-out 0.8s infinite';
+                
+                console.log("呼吸序列已手动强制启动");
             } else {
                 card.style.display = 'none';
                 card.style.animation = 'none';
             }
-        }
+        });
         function updateClock() {
             document.getElementById('clock').innerText = new Date().toLocaleTimeString('zh-CN', {hour12: false});
         }
