@@ -11,22 +11,16 @@
     };
 
     class RainDrop {
-    constructor(x, y, sizeRange, ratio) {
-        this.ratio = ratio;
-        // 1. 大小随机化：参考 simulator.ts 的 spawnSize
-        const baseSize = Math.random() * (sizeRange[1] - sizeRange[0]) + sizeRange[0];
-        this.r = baseSize * ratio;
-        
+    constructor(x, y, size, ratio) {
         this.x = x;
         this.y = y;
+        this.r = size * ratio; // 这里的 size 已经是计算好的随机数
         this.velocity = 0;
-        // 2. 引入随机水平漂移：参考 raindrop.ts 的 shifting
-        this.shifting = (Math.random() - 0.5) * 50 * ratio; 
         this.terminated = false;
         this.lastTrailY = y;
-        // 轨迹间距随机化
+        this.shifting = (Math.random() - 0.5) * 10; 
         this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
-    }
+    }}
 
     update(dt, height) {
         // 3. 增加阻力感，让下落不那么线性
