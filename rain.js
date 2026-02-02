@@ -4,9 +4,9 @@
     const CONFIG = {
         gravity: 2400,
         trailDistance: [20, 35], 
-        refraction: 0.5,        
-        alphaMultiply: 20.0,    // 调低一点，让雨滴边缘更自然
-        alphaSubtract: 0.1,     // 调低过滤阈值，确保小雨滴可见
+        refraction: 0.5,         
+        alphaMultiply: 20.0,    
+        alphaSubtract: 0.1,     
         spawnInterval: 0.1,    
     };
 
@@ -14,41 +14,36 @@
         constructor(x, y, size, ratio) {
             this.x = x;
             this.y = y;
+            // 核心 1：这里接收生成的随机大小
             this.r = size * ratio; 
             this.velocity = 0;
             this.terminated = false;
             this.lastTrailY = y;
-            // 随机物理属性：决定左右晃动的幅度
-            this.shifting = (Math.random() - 0.5) * 15 * ratio; 
-            // 随机相位：让每颗雨滴晃动的频率不同
-            this.phase = Math.random() * Math.PI * 2;
-            // 轨迹间距随机化
+            // 物理特性：大雨滴摆动幅度略大
+            this.shifting = (Math.random() - 0.5) * (size * 0.2); 
             this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
         }
 
         update(dt, height) {
-            // 1. 模拟空气阻力：雨滴越大，受重力影响越明显，但也会有阻力上限
+            // 物理 1：增加阻力感，让下落不那么线性
             const resistance = 0.005 * this.r; 
             const accel = CONFIG.gravity - (this.velocity * resistance);
             
             this.velocity += accel * dt;
             this.y += this.velocity * dt;
             
-            // 2. 模拟由于玻璃表面不平整导致的“S”型路径，不再直线下落
-            // 使用正弦函数结合 phase 和 shifting 实现
-            this.x += Math.sin(this.y * 0.03 + this.phase) * (this.shifting * dt);
+            // 物理 2：让路径微微晃动，不再“太直”
+            this.x += Math.sin(this.y * 0.05) * (this.shifting * dt);
 
-            // 3. 检查是否达到生成下一个拖尾的距离
             if (this.y - this.lastTrailY > this.nextTrailDist) {
                 this.lastTrailY = this.y;
                 return true; 
             }
-            
-            // 4. 边界销毁
             if (this.y > height + 100) this.terminated = true;
             return false;
         }
-    }
+    } // RainDrop 类结束
+
     function RainRenderer(container) {
         this.container = container;
         this.canvas = document.createElement('canvas');
@@ -65,7 +60,6 @@
     RainRenderer.prototype.init = function() {
         const gl = this.gl;
         const vs = `attribute vec2 p;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=p*0.5+0.5;v.y=1.0-v.y;}`;
-        // 修改 FS 中处理 water 纹理的部分，加入扭曲逻辑
         const fs = `
             precision mediump float;
             uniform sampler2D u_bg, u_water;
@@ -77,18 +71,10 @@
                 vec2 s = u_res / u_bgRes;
                 float scale = max(s.x, s.y);
                 vec2 uv = (v - 0.5) * (s / scale) + 0.5;
-        
-                // 5. 模拟折射形变：雨滴应该对背景产生“透镜”收缩效果
                 vec4 water = texture2D(u_water, v);
-                
-                // 利用 water.b (质量/高度) 来做更真实的折射
-                // 这里的 0.2 是折射率，让背景看起来像被吸进雨滴里
                 vec2 refractionOffset = (water.rg - 0.5) * u_ref * water.b;
-                
                 float alpha = clamp(water.a * u_aMult - u_aSub, 0.0, 1.0);
                 vec4 bg = texture2D(u_bg, uv + refractionOffset);
-                
-                // 增加高光感 (Specular)
                 float highlight = pow(water.b, 3.0) * 0.3;
                 gl_FragColor = mix(bg, bg + highlight, alpha);
             }
@@ -107,7 +93,6 @@
         this.texBg = gl.createTexture();
         this.texWater = gl.createTexture();
         
-        // --- 【核心修复：雨滴纹理参数设置】 ---
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -181,9 +166,12 @@
         const dt = Math.min((now - this.lastTime) / 1000, 0.033);
         this.lastTime = now;
 
-        // 1. 生成逻辑：先计算随机 size 数值，再传给构造函数
+        // 核心 2：颗粒大小随机改这里
         if (Math.random() < CONFIG.spawnInterval) {
-            const randomSize = Math.random() * 50 + 30; // 随机 30~80
+            const minSize = 25; // 最小颗粒
+            const maxSize = 85; // 最大颗粒
+            const randomSize = Math.random() * (maxSize - minSize) + minSize;
+            
             const xPos = Math.random() * this.waterCanvas.width;
             this.drops.push(new RainDrop(xPos, -100, randomSize, this.ratio));
         }
@@ -191,7 +179,6 @@
         const ctx = this.waterCtx;
         ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
-        // 2. 绘制静态拖尾
         for (let i = this.staticDrops.length - 1; i >= 0; i--) {
             let s = this.staticDrops[i];
             s.r -= dt * 2.5; 
@@ -199,38 +186,30 @@
             ctx.drawImage(this.dropShape, s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
         }
 
-        // 3. 绘制动态雨滴
         for (let i = this.drops.length - 1; i >= 0; i--) {
             let d = this.drops[i];
-            
-            // 物理更新
             if (d.update(dt, this.waterCanvas.height)) {
                 this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.4 });
             }
             if (d.terminated) { this.drops.splice(i, 1); continue; }
             
-            // 计算拉伸
             const stretch = 1.2 + (d.velocity / 2000);
             const w = d.r * 2;
             const h = d.r * 2 * stretch;
 
             ctx.save();
             ctx.translate(d.x, d.y);
-            // 即使是简单的下落，也加入微小的摆动倾角
             ctx.rotate(Math.sin(d.y * 0.05) * 0.05); 
             ctx.drawImage(this.dropShape, -w / 2, -h / 2, w, h);
             ctx.restore();
         }
 
-        // --- WebGL 渲染管线 ---
         if (!this.backgroundLoaded) return requestAnimationFrame(t => this.loop(t));
 
         const gl = this.gl;
         gl.useProgram(this.prog);
-
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.texBg);
-        
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
@@ -247,6 +226,7 @@
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         requestAnimationFrame(t => this.loop(t));
     };
+
     window.addEventListener('load', () => {
         const container = document.getElementById('container');
         if(!container) return;
