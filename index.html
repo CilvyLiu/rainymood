@@ -161,26 +161,30 @@
 
        
          /* --- 找到 index.html 里的这一段并替换 --- */
-        // 用 ID 绑定，避开全局命名冲突
         document.getElementById('focusBtn').addEventListener('click', function(e) {
             e.stopPropagation();
             const card = document.getElementById('mainRule');
+            const btn = this;
             const isHidden = card.style.display === 'none' || card.style.display === '';
             
             if (isHidden) {
+                // --- 开启：纪律降临 ---
                 card.style.display = 'block';
-                
-                // --- 核心：强制刷新并注入 ---
                 card.style.animation = 'none';
-                void card.offsetWidth; // 这一行是强迫浏览器“眨眼”重新看代码
-                
-                // 确保名字 breathing 对应你 CSS 里的 @keyframes
+                void card.offsetWidth; 
+                // 使用你 CSS 里定义的 breathing 名字
                 card.style.animation = 'fadeInBlur 0.8s ease-out forwards, breathing 8s ease-in-out 0.8s infinite';
                 
-                console.log("呼吸序列已手动强制启动");
+                btn.classList.remove('btn-alert');
+                btn.innerText = "FOCUS MODE";
             } else {
+                // --- 关闭：系统进入警觉 ---
                 card.style.display = 'none';
                 card.style.animation = 'none';
+                
+                // 赋予按钮那个疯狂的抖动特效
+                btn.classList.add('btn-alert');
+                btn.innerText = "SYSTEM ALERT";
             }
         });
         function updateClock() {
