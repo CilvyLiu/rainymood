@@ -205,6 +205,7 @@
     const dt = Math.min((now - this.lastTime) / 1000, 0.033);
     this.lastTime = now;
 
+    // 1. 生成雨滴
     if (Math.random() < this.spawnChance) {
         const r = this.sizeRange;
         const size = Math.random() * (r[1] - r[0]) + r[0];
@@ -214,53 +215,61 @@
     const ctx = this.waterCtx;
     ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
+    // 2. 更新与绘制
     [this.staticDrops, this.drops].forEach((list, idx) => {
         for (let i = list.length - 1; i >= 0; i--) {
             let d = list[i];
             
             if (idx === 0) {
+                // 玻璃上的残迹缩小
                 d.r -= dt * this.fadeSpeed;
-            } else if (d.update(dt, this.waterCanvas.height, now)) {
-                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.45, terminated: false });
+            } else {
+                // 下落雨滴更新物理位置
+                if (d.update(dt, this.waterCanvas.height, now)) {
+                    // 产生拖尾残迹
+                    this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.45, terminated: false });
+                }
             }
             
+            // 边界检查
             if (d.terminated || d.r < 0.5) { 
                 list.splice(i, 1); 
                 continue; 
             }
 
+            // --- 核心绘制部分 ---
             ctx.save();
             ctx.translate(d.x, d.y);
 
             if (idx === 1) { 
-                // --- 自然形变逻辑 ---
-                // 1. 计算合速度方向 (风速 vx + 重力 vy)
-                const angle = Math.atan2(d.vx, d.vy); 
-                ctx.rotate(-angle); 
+                // 计算移动方向的角度 (修正为正确的 atan2 顺序)
+                const angle = Math.atan2(d.vy, d.vx); 
+                ctx.rotate(angle - Math.PI / 2); // 减去 90 度使雨滴头朝下
 
-                // 2. 模拟拉伸：速度越快，受空气阻力影响越长，受表面张力影响越细
+                // 计算拉伸：速度越快越长
                 const speed = Math.sqrt(d.vx * d.vx + d.vy * d.vy);
-                const stretch = Math.min(speed * 0.03, d.r * 1.2); 
+                const stretch = Math.min(speed * 0.05, d.r * 2); 
                 
-                // 3. 绘图：纵向随速度伸长，横向微微收缩
-                const sX = d.r;
-                const sY = d.r + stretch;
-                ctx.drawImage(this.dropShape, -sX, -sY, sX * 2, sY * 2);
+                // 纵向拉伸绘制
+                ctx.drawImage(this.dropShape, -d.r, -d.r, d.r * 2, (d.r + stretch) * 2);
             } else {
-                // 玻璃上的静止残迹：保持圆形，视觉较轻
-                ctx.globalAlpha = 0.5;
+                // 静态残迹
+                ctx.globalAlpha = 0.6;
                 ctx.drawImage(this.dropShape, -d.r, -d.r, d.r * 2, d.r * 2);
             }
             ctx.restore();
         }
     });
 
+    // 3. WebGL 混合与渲染 (保持原样)
     if (!this.backgroundLoaded) return requestAnimationFrame(t => this.loop(t));
     
     const gl = this.gl;
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.texWater);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
+    
+    // 必须要设置纹理参数，否则某些浏览器下会黑屏
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
