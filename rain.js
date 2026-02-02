@@ -11,49 +11,44 @@
     };
 
     class RainDrop {
-    constructor(x, y, size, ratio) {
-        this.x = x;
-        this.y = y;
-        this.r = size * ratio; // 这里的 size 已经是计算好的随机数
-        this.velocity = 0;
-        this.terminated = false;
-        this.lastTrailY = y;
-        this.shifting = (Math.random() - 0.5) * 10; 
-        this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
-    }}
-
-    update(dt, height) {
-        // 3. 增加阻力感，让下落不那么线性
-        const resistance = 0.005 * this.r; 
-        const accel = CONFIG.gravity - (this.velocity * resistance);
-        
-        this.velocity += accel * dt;
-        this.y += this.velocity * dt;
-        
-        // 4. 让路径微微晃动，不再“太直”
-        this.x += Math.sin(this.y * 0.05) * (this.shifting * dt);
-
-        if (this.y - this.lastTrailY > this.nextTrailDist) {
-            this.lastTrailY = this.y;
-            return true; 
+        constructor(x, y, size, ratio) {
+            this.x = x;
+            this.y = y;
+            this.r = size * ratio; 
+            this.velocity = 0;
+            this.terminated = false;
+            this.lastTrailY = y;
+            // 随机物理属性：决定左右晃动的幅度
+            this.shifting = (Math.random() - 0.5) * 15 * ratio; 
+            // 随机相位：让每颗雨滴晃动的频率不同
+            this.phase = Math.random() * Math.PI * 2;
+            // 轨迹间距随机化
+            this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
         }
-        if (this.y > height + 100) this.terminated = true;
-        return false;
-    }
-}
 
         update(dt, height) {
-            this.velocity += CONFIG.gravity * dt;
+            // 1. 模拟空气阻力：雨滴越大，受重力影响越明显，但也会有阻力上限
+            const resistance = 0.005 * this.r; 
+            const accel = CONFIG.gravity - (this.velocity * resistance);
+            
+            this.velocity += accel * dt;
             this.y += this.velocity * dt;
+            
+            // 2. 模拟由于玻璃表面不平整导致的“S”型路径，不再直线下落
+            // 使用正弦函数结合 phase 和 shifting 实现
+            this.x += Math.sin(this.y * 0.03 + this.phase) * (this.shifting * dt);
+
+            // 3. 检查是否达到生成下一个拖尾的距离
             if (this.y - this.lastTrailY > this.nextTrailDist) {
                 this.lastTrailY = this.y;
                 return true; 
             }
+            
+            // 4. 边界销毁
             if (this.y > height + 100) this.terminated = true;
             return false;
         }
     }
-
     function RainRenderer(container) {
         this.container = container;
         this.canvas = document.createElement('canvas');
