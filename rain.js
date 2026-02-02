@@ -196,7 +196,7 @@
         for (let i = this.drops.length - 1; i >= 0; i--) {
             let d = this.drops[i];
             if (d.update(dt, this.waterCanvas.height)) {
-                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.4 });
+                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.2 });
             }
             if (d.terminated) { this.drops.splice(i, 1); continue; }
             
