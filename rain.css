@@ -170,6 +170,8 @@ body, html {
     margin-bottom: 30px; 
     text-align: left;
     box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+    overflow: visible !important; /* 核心：允许呼吸灯的蓝色光晕扩散到卡片边界外 */
+    border: 1px solid rgba(125, 211, 252, 0.2); /* 初始边框，给呼吸一个起点 */
     }
 
 @keyframes fadeInBlur {
