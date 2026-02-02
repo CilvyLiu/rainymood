@@ -168,12 +168,13 @@
             
             if (isHidden) {
                 card.style.display = 'block';
-                // 1. 强制重置动画状态
+                // 关键：清除所有之前的动画状态
                 card.style.animation = 'none';
-                // 2. 触发重绘（这是关键，不写这个浏览器就不动）
-                card.offsetHeight; 
-                // 3. 重新注入复合动画：先入场，再呼吸
-                card.style.animation = 'fadeInBlur 0.8s ease-out forwards, breathing 10s ease-in-out 0.8s infinite';
+                card.offsetHeight; // 强制重绘
+                
+                // 关键：手动拼接动画，确保 breathing 被排在后面且时间轴正确
+                // 我们给 breathing 一个更短的周期（6s），让你能更快看到效果
+                card.style.animation = 'fadeInBlur 0.8s ease-out forwards, breathing 6s ease-in-out 0.8s infinite';
             } else {
                 card.style.display = 'none';
                 card.style.animation = 'none';
