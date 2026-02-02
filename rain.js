@@ -192,24 +192,25 @@
     };
 
     window.addEventListener('load', () => {
-        const container = document.getElementById('container');
-        if(!container) return;
-        const renderer = new RainRenderer(container);
-        renderer.updateBackground('pensive.png');
-        window.rainEngine = renderer;
-        
-        window.addEventListener('resize', () => renderer.resize());
+    const container = document.getElementById('container');
+    if(!container) return;
 
-        // 场景切换函数：联动 HTML 里的 Select
-        window.changeScene = (url) => {
-            renderer.updateBackground(url);
-            const asc = document.getElementById('audio_scene');
-            if(asc) {
-                asc.src = url.split('.')[0] + '.mp3';
-                asc.play().catch(() => {});
-            }
-            const pbtn = document.getElementById('pbtn');
-            if(pbtn) pbtn.innerText = "⏸";
-        };
+    // 1. 先初始化引擎
+    const renderer = new RainRenderer(container);
+    window.rainEngine = renderer;
+    
+    // 2. 核心修复：确保首张背景图加载后再启动
+    // 强制执行一次首屏加载
+    renderer.updateBackground('pensive.png'); 
+
+    // 3. 处理 Resize
+    window.addEventListener('resize', () => {
+        renderer.resize();
     });
+
+    // 4. 初始化天气状态（确保 HTML 默认值同步到引擎）
+    if(document.getElementById('weatherSelect')) {
+        changeWeather(); 
+    }
+});
 })();
