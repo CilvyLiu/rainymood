@@ -20,23 +20,38 @@
             this.terminated = false;
             this.lastTrailY = y;
             this.lastTrailX = x;
-            this.windSensitivity = Math.random() * 0.5 + 0.8;
-            this.shifting = (Math.random() - 0.5) * (size * 0.4);
+            
+            // --- 核心修改：打破统一规律 ---
+            // 1. 敏感度随机：有的雨滴受风影响大，有的几乎垂直掉落
+            this.windSensitivity = Math.random() * 0.8 + 0.4; 
+            // 2. 初始相位随机：让正弦波动的起始点分散开
+            this.phase = Math.random() * Math.PI * 2; 
+            // 3. 自有频率随机：让每滴雨晃动的快慢不一
+            this.oscFreq = Math.random() * 0.02 + 0.01;
+            
             this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
-            this.phase = Math.random() * Math.PI * 2;
         }
 
-        update(dt, height) {
+        update(dt, height, time) { // 注意这里多传了一个 time 参数
             const currentGravity = this.engine.customGravity || CONFIG.gravity;
-            const baseWind = (this.engine.spawnChance > 0.5) ? 600 : 200;
-            const windAccel = baseWind * this.windSensitivity;
-            const friction = 0.003 * this.r;
+            
+            // --- 核心修改：模拟不规则阵风 ---
+            // 叠加三个不同频率的波，模拟自然界中飘忽不定的风
+            let windBase = Math.sin(time * 0.001) * 200 + 
+                           Math.sin(time * 0.00317) * 100 + 
+                           Math.sin(time * 0.0005) * 150;
+            
+            if (this.engine.spawnChance > 0.5) windBase *= 1.5; 
+            
+            const windAccel = windBase * this.windSensitivity;
+            const friction = 0.004 * this.r; 
             
             this.vy += (currentGravity - (this.vy * friction)) * dt;
             this.vx += (windAccel - (this.vx * friction)) * dt;
 
             this.y += this.vy * dt;
-            this.x += this.vx * dt + Math.sin(this.y * 0.04 + this.phase) * (this.shifting * dt);
+            // 这里的波动不再是全局统一的，而是受个体 phase 和 oscFreq 影响
+            this.x += this.vx * dt + Math.sin(this.y * this.oscFreq + this.phase) * 0.8;
 
             const distMoved = Math.sqrt(Math.pow(this.y - this.lastTrailY, 2) + Math.pow(this.x - this.lastTrailX, 2));
             if (distMoved > this.nextTrailDist) {
@@ -46,7 +61,7 @@
             }
             if (this.y > height + 100) this.terminated = true;
             return false;
-        }
+        }        
     }
 
     function RainRenderer(container) {
