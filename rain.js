@@ -1,182 +1,227 @@
 'use strict';
 
 (function() {
-    // 模拟源码的配置参数
-    const config = {
-        brightness: 1.1,      // 稍微提高雨滴亮度
-        alphaMultiply: 10.0,  // 提高对比度
-        alphaSubtract: 1.5,   // 关键：减小这个值，让雨滴痕迹变厚
-        refraction: 0.5       // 增加折射率，让变形更明显
+    /**
+     * 第一步：First - 配置仿真参数
+     * 整合了附件 simulator.ts 中的物理常量
+     */
+    const CONFIG = {
+        gravity: 2400,            // 重力加速度
+        spawnInterval: [0.1, 0.2], // 生成间隔 (秒)
+        spawnSize: [15, 35],      // 初始雨滴大小
+        trailDistance: [20, 40],   // 产生拖尾的距离阈值
+        refraction: 0.6,          // WebGL 折射强度
+        alphaMultiply: 30.0,      // 边缘对比度
+        alphaSubtract: 0.2        // 剔除微小水汽
     };
 
-    // 动态生成源码要求的形状贴图，确保即便没有外部 png 也能正常产生雨滴形状
-    function createDropTexture() {
-    const size = 64;
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    const center = size / 2;
-    ctx.clearRect(0, 0, size, size);
-    
-    // 增加 B 通道强度（决定水汽感）和 Alpha 饱和度
-    const grad = ctx.createRadialGradient(center, center, 0, center, center, center);
-    grad.addColorStop(0, 'rgba(128, 128, 255, 1.0)'); 
-    grad.addColorStop(0.6, 'rgba(128, 128, 255, 0.8)'); 
-    grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); 
-    
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(center, center, center * 0.9, 0, Math.PI * 2);
-    ctx.fill();
-    return canvas;
-}
+    /**
+     * 第二步：Next - 物理引擎核心 (参考附件 raindrop.ts)
+     */
+    class RainDrop {
+        constructor(x, y, size, ratio) {
+            this.x = x;
+            this.y = y;
+            this.r = size * ratio;
+            this.mass = Math.pow(this.r, 2);
+            this.velocity = 0;
+            this.terminated = false;
+            this.lastTrailY = y;
+            this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
+        }
+
+        update(dt, height) {
+            // 模拟阻力：体积越大阻力越大
+            const resistance = Math.pow(this.r, 1.2) * 0.1;
+            const accel = CONFIG.gravity - resistance;
+            this.velocity += accel * dt;
+            this.y += this.velocity * dt;
+
+            // 检查是否需要留下拖尾 (Split 逻辑)
+            if (this.y - this.lastTrailY > this.nextTrailDist) {
+                this.lastTrailY = this.y;
+                return true; 
+            }
+            if (this.y > height + 100) this.terminated = true;
+            return false;
+        }
+    }
+
     function RainRenderer(container) {
         this.container = container;
         this.canvas = document.createElement('canvas');
         container.appendChild(this.canvas);
         this.gl = this.canvas.getContext('webgl', { alpha: false, depth: false });
-        this.dropImg = createDropTexture();
-        this.ratio = window.devicePixelRatio || 1;
+        
         this.drops = [];
-        this.options = { rainChance: 0.4, minR: 10, maxR: 25, baseSpeed: 4 };
+        this.staticDrops = []; // 存储拖尾
+        this.lastTime = 0;
+        this.spawnTimer = 0;
+        
         this.init();
     }
 
     RainRenderer.prototype.init = function() {
         const gl = this.gl;
-        const vs = 'attribute vec2 p;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=p*0.5+0.5;v.y=1.0-v.y;}';
-        // 核心：基于源码的折射与亮度混合算法
+        
+        // Shader 保持高效折射运算
+        const vs = `attribute vec2 p;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=p*0.5+0.5;v.y=1.0-v.y;}`;
         const fs = `
             precision mediump float;
             uniform sampler2D u_bg, u_water;
             varying vec2 v;
-            uniform float u_br, u_aMult, u_aSub, u_ref;
+            uniform float u_ref, u_aMult, u_aSub;
             void main() {
                 vec4 water = texture2D(u_water, v);
                 vec2 offset = (water.rg - 0.5) * u_ref;
                 float alpha = clamp(water.a * u_aMult - u_aSub, 0.0, 1.0);
                 vec4 bg = texture2D(u_bg, v + offset);
-                gl_FragColor = mix(bg, bg * u_br + water.b * 0.2, alpha);
+                gl_FragColor = mix(bg, bg + water.b * 0.2, alpha);
             }
         `;
-        
+
         const prog = gl.createProgram();
-        const addSh = (t, s) => { const h = gl.createShader(t); gl.shaderSource(h, s); gl.compileShader(h); gl.attachShader(prog, h); };
-        addSh(gl.VERTEX_SHADER, vs); addSh(gl.FRAGMENT_SHADER, fs);
+        const addShader = (t, s) => { const h = gl.createShader(t); gl.shaderSource(h, s); gl.compileShader(h); gl.attachShader(prog, h); };
+        addShader(gl.VERTEX_SHADER, vs); addShader(gl.FRAGMENT_SHADER, fs);
         gl.linkProgram(prog); gl.useProgram(prog);
         this.prog = prog;
 
         this.texBg = gl.createTexture();
         this.texWater = gl.createTexture();
-        this.dropCanvas = document.createElement('canvas');
-        this.dropCtx = this.dropCanvas.getContext('2d');
+        this.waterCanvas = document.createElement('canvas');
+        this.waterCtx = this.waterCanvas.getContext('2d');
+        
+        // 生成模拟法线的雨滴形状贴图
+        this.dropShape = this.createDropShape();
 
-        // 顶点数据
         gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
         const p = gl.getAttribLocation(prog, 'p');
         gl.enableVertexAttribArray(p);
         gl.vertexAttribPointer(p, 2, gl.FLOAT, false, 0, 0);
 
         this.resize();
-        this.loop();
+        requestAnimationFrame(t => this.loop(t));
+    };
+
+    RainRenderer.prototype.createDropShape = function() {
+        const size = 64;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const img = ctx.createImageData(size, size);
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                let dx = (x - 32)/32, dy = (y - 32)/32;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                let i = (y * size + x) * 4;
+                if (dist <= 1.0) {
+                    let f = Math.pow(1.0 - dist, 2);
+                    img.data[i] = (dx * 0.5 + 0.5) * 255;   // R: X 偏移
+                    img.data[i+1] = (dy * 0.5 + 0.5) * 255; // G: Y 偏移
+                    img.data[i+2] = f * 255;               // B: 高光
+                    img.data[i+3] = f * 255;               // A: 蒙版
+                }
+            }
+        }
+        ctx.putImageData(img, 0, 0);
+        return canvas;
     };
 
     RainRenderer.prototype.resize = function() {
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
-    this.ratio = window.devicePixelRatio || 1;
-
-    this.container.style.overflow = 'hidden';
-    this.canvas.style.position = 'absolute';
-    this.canvas.style.width = this.width + 'px';
-    this.canvas.style.height = this.height + 'px';
-
-    const realW = Math.floor(this.width * this.ratio);
-    const realH = Math.floor(this.height * this.ratio);
-
-    this.canvas.width = realW;
-    this.canvas.height = realH;
-    
-    if (this.dropCanvas) {
-        this.dropCanvas.width = realW;
-        this.dropCanvas.height = realH;
-    }
-
-    // 错误修正点：从 gl.viewport 改为 this.gl.viewport
-    if (this.gl) {
-        this.gl.viewport(0, 0, realW, realH);
-    }
-};
+        this.width = window.innerWidth;
+        this.height = window.innerHeight;
+        this.ratio = window.devicePixelRatio || 1;
+        this.canvas.width = this.waterCanvas.width = this.width * this.ratio;
+        this.canvas.height = this.waterCanvas.height = this.height * this.ratio;
+        this.canvas.style.width = this.width + 'px';
+        this.canvas.style.height = this.height + 'px';
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    };
 
     RainRenderer.prototype.updateBackground = function(url) {
-    const gl = this.gl;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-        
-        // 关键：设置包裹模式防止图片被强制拉伸/拽大
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const gl = this.gl;
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            gl.bindTexture(gl.TEXTURE_2D, this.texBg);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        };
+        img.src = url;
     };
-    img.src = url;
-};
 
-   RainRenderer.prototype.loop = function() {
-    // 1. 物理层：生成并更新位置
-    if (Math.random() < this.options.rainChance) {
-        this.drops.push({
-            x: Math.random() * this.dropCanvas.width,
-            y: -50, // 初始位置稍微露头
-            r: (Math.random() * (this.options.maxR - this.options.minR) + this.options.minR) * this.ratio,
-            v: (this.options.baseSpeed + Math.random() * 5) * this.ratio // 确保速度足够大
-        });
-    }
+    RainRenderer.prototype.loop = function(now) {
+        const dt = Math.min((now - this.lastTime) / 1000, 0.033);
+        this.lastTime = now;
 
-    // 2. 绘制层：必须彻底清除上一帧
-    this.dropCtx.globalCompositeOperation = 'destination-out'; // 关键：先清空
-    this.dropCtx.fillStyle = 'rgba(0, 0, 0, 0.1)';           // 产生拖尾留痕
-    this.dropCtx.fillRect(0, 0, this.dropCanvas.width, this.dropCanvas.height);
-    this.dropCtx.globalCompositeOperation = 'source-over';    // 切回正常模式
-
-    for (let i = this.drops.length - 1; i >= 0; i--) {
-        let d = this.drops[i];
-        d.y += d.v; // 执行掉落动画
-
-        // 绘制梭形（长条）雨滴，增加高度感 (d.r * 4)
-        this.dropCtx.drawImage(
-            this.dropImg, 
-            d.x - d.r * 0.5, d.y, 
-            d.r, d.r * 4
-        ); 
-
-        // 越界移除：确保不会在内存堆积
-        if (d.y > this.dropCanvas.height + 100) {
-            this.drops.splice(i, 1);
+        // 生成器
+        this.spawnTimer -= dt;
+        if (this.spawnTimer <= 0) {
+            const size = (Math.random() * (CONFIG.spawnSize[1] - CONFIG.spawnSize[0]) + CONFIG.spawnSize[0]);
+            this.drops.push(new RainDrop(Math.random() * this.waterCanvas.width, -100, size, this.ratio));
+            this.spawnTimer = Math.random() * (CONFIG.spawnInterval[1] - CONFIG.spawnInterval[0]) + CONFIG.spawnInterval[0];
         }
-    }
 
-    // 3. WebGL 渲染：强制同步纹理
-    const gl = this.gl;
-    gl.useProgram(this.prog);
-    
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, this.texWater);
-    // 关键：每一帧必须重新上传
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.dropCanvas);
+        const ctx = this.waterCtx;
+        ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
-    const loc = (n) => gl.getUniformLocation(this.prog, n);
-    gl.uniform1i(loc("u_water"), 1);
-    gl.uniform1f(loc("u_aMult"), 50.0); // 调高对比度，确保能看到
-    gl.uniform1f(loc("u_aSub"), 0.05);  // 调低过滤，显示拖尾
+        // 绘制拖尾 (静止小水滴)
+        for (let i = this.staticDrops.length - 1; i >= 0; i--) {
+            let s = this.staticDrops[i];
+            s.r -= dt * 2; // 缓慢蒸发
+            if (s.r < 1) { this.staticDrops.splice(i, 1); continue; }
+            ctx.drawImage(this.dropShape, s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
+        }
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    requestAnimationFrame(this.loop.bind(this));
-};
+        // 更新并绘制主雨滴
+        for (let i = this.drops.length - 1; i >= 0; i--) {
+            let d = this.drops[i];
+            if (d.update(dt, this.waterCanvas.height)) {
+                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.3 });
+            }
+
+            // 碰撞融合逻辑 (Merge)
+            for (let j = 0; j < this.drops.length; j++) {
+                let other = this.drops[j];
+                if (d === other || other.terminated) continue;
+                let dist = Math.hypot(d.x - other.x, d.y - other.y);
+                if (dist < (d.r + other.r) * 0.7) {
+                    if (d.r >= other.r) {
+                        d.r = Math.min(d.r + other.r * 0.15, 70 * this.ratio);
+                        other.terminated = true;
+                    }
+                }
+            }
+
+            if (d.terminated) { this.drops.splice(i, 1); continue; }
+            
+            // 绘制拉长的下落雨滴
+            ctx.drawImage(this.dropShape, d.x - d.r * 0.8, d.y - d.r, d.r * 1.6, d.r * 3.5);
+        }
+
+        // WebGL 混合
+        const gl = this.gl;
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.texWater);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+        const loc = (n) => gl.getUniformLocation(this.prog, n);
+        gl.uniform1i(loc("u_water"), 1);
+        gl.uniform1f(loc("u_ref"), CONFIG.refraction);
+        gl.uniform1f(loc("u_aMult"), CONFIG.alphaMultiply);
+        gl.uniform1f(loc("u_aSub"), CONFIG.alphaSubtract);
+
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        requestAnimationFrame(t => this.loop(t));
+    };
+
+    /**
+     * 最后：Finally - 场景切换逻辑 (完整保留并增强)
+     */
     window.addEventListener('load', () => {
         const container = document.getElementById('container');
         if(!container) return;
@@ -186,20 +231,23 @@
         window.rainEngine = renderer;
         
         window.addEventListener('resize', () => renderer.resize());
-        // 场景切换
+
+        // 场景切换全局函数
         window.changeScene = (url) => {
-    renderer.updateBackground(url);
-    const asc = document.getElementById('audio_scene');
-    if(!asc) return;
-    
-    // 自动匹配：pensive.png -> pensive.mp3
-    const audioSrc = url.split('.')[0] + '.mp3'; 
-    asc.src = audioSrc;
-    asc.play().catch(() => console.log("等待交互后播放"));
-    
-    // 确保播放按钮状态同步
-    const pbtn = document.getElementById('pbtn');
-    pbtn.innerText = "⏸";
-};
+            // 1. 更新背景贴图
+            renderer.updateBackground(url);
+            
+            // 2. 音频同步切换
+            const asc = document.getElementById('audio_scene');
+            if(asc) {
+                const audioSrc = url.split('.')[0] + '.mp3'; 
+                asc.src = audioSrc;
+                asc.play().catch(() => console.log("等待用户交互后播放音频"));
+            }
+            
+            // 3. UI 状态同步
+            const pbtn = document.getElementById('pbtn');
+            if(pbtn) pbtn.innerText = "⏸";
+        };
     });
 })();
