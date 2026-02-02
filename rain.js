@@ -127,64 +127,74 @@
 };
 
    RainRenderer.prototype.loop = function() {
-        // 1. 生成新雨滴
-        if (Math.random() < this.options.rainChance) {
-            this.drops.push({
-                // 确保 x 坐标覆盖整个物理宽度
-                x: Math.random() * this.dropCanvas.width,
-                y: -100,
-                r: (Math.random() * (this.options.maxR - this.options.minR) + this.options.minR) * this.ratio,
-                // 给速度一个保底值，确保它们能“飞”下来
-                v: (Math.max(this.options.baseSpeed, 4) + Math.random() * 5) * this.ratio 
-            });
+    // 1. 生成新雨滴
+    if (Math.random() < this.options.rainChance) {
+        this.drops.push({
+            // 确保 x 坐标覆盖整个物理宽度
+            x: Math.random() * this.dropCanvas.width,
+            y: -150, // 从更上方开始，避免突兀出现
+            r: (Math.random() * (this.options.maxR - this.options.minR) + this.options.minR) * this.ratio,
+            v: (Math.max(this.options.baseSpeed, 4) + Math.random() * 5) * this.ratio 
+        });
+    }
+
+    // 2. 离屏绘制
+    // 使用 'source-over' 确保 alpha 混合正常，背景颜色 rgba(0,0,0,0.1) 决定了拖尾的长度
+    this.dropCtx.globalCompositeOperation = 'source-over';
+    this.dropCtx.fillStyle = 'rgba(0, 0, 0, 0.15)'; 
+    this.dropCtx.fillRect(0, 0, this.dropCanvas.width, this.dropCanvas.height);
+
+    this.dropCtx.globalAlpha = 0.9; 
+    for (let i = this.drops.length - 1; i >= 0; i--) {
+        let d = this.drops[i];
+        d.y += d.v; 
+        
+        // 关键：绘制梭形雨滴。确保使用 d.r * 2 以上的长度来体现流速感
+        this.dropCtx.drawImage(
+            this.dropImg, 
+            d.x - d.r * 0.8, d.y, 
+            d.r * 1.6, d.r * 4.5 
+        ); 
+
+        if (d.y > this.dropCanvas.height + 150) {
+            this.drops.splice(i, 1);
         }
+    }
+    this.dropCtx.globalAlpha = 1.0;
 
-        // 2. 离屏绘制
-        this.dropCtx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // 稍微加深底色，增加拖尾厚度
-        this.dropCtx.fillRect(0, 0, this.dropCanvas.width, this.dropCanvas.height);
+    // 3. WebGL 最终渲染
+    const gl = this.gl;
+    if (!gl) return;
+    gl.useProgram(this.prog);
 
-        this.dropCtx.globalAlpha = 0.8; 
-        for (let i = this.drops.length - 1; i >= 0; i--) {
-            let d = this.drops[i];
-            d.y += d.v; 
-            
-            // 关键：增加绘制的宽度比 (0.8) 和 长度比 (3.0)，让它从“细线”变“梭形”
-            this.dropCtx.drawImage(
-                this.dropImg, 
-                d.x - d.r * 0.8, d.y - d.r, 
-                d.r * 1.6, d.r * 3.5 
-            ); 
+    // 显式开启混合模式，防止雨滴贴图的透明区域变成黑色或消失
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-            if (d.y > this.dropCanvas.height + 100) {
-                this.drops.splice(i, 1);
-            }
-        }
-        this.dropCtx.globalAlpha = 1.0;
+    // 绑定背景纹理到单元 0
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.texBg);
+    
+    // 绑定雨滴 Canvas 纹理到单元 1
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.texWater);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.dropCanvas);
 
-        // 3. WebGL 最终渲染
-        const gl = this.gl;
-        if (!gl) return;
-        gl.useProgram(this.prog);
+    const loc = (n) => gl.getUniformLocation(this.prog, n);
+    
+    // 关键：必须明确告诉 Shader 采样器对应的单元编号
+    gl.uniform1i(loc("u_bg"), 0);
+    gl.uniform1i(loc("u_water"), 1);
 
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, this.texWater);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.dropCanvas);
+    // --- 核心调优：确保显影 ---
+    gl.uniform1f(loc("u_br"), 1.2);        // 提亮雨滴高光
+    gl.uniform1f(loc("u_aMult"), 40.0);    // 极大提高 Alpha 倍率，强制在 Shader 中显影
+    gl.uniform1f(loc("u_aSub"), 0.05);     // 极低扣除量，确保哪怕是微弱的拖尾也能穿透
+    gl.uniform1f(loc("u_ref"), 0.25);      // 适度折射，防止背景过度扭曲
 
-        const loc = (n) => gl.getUniformLocation(this.prog, n);
-        gl.uniform1i(loc("u_bg"), 0);
-        gl.uniform1i(loc("u_water"), 1);
-
-        // --- 核心调优：解决“细线”和“隐形” ---
-        gl.uniform1f(loc("u_br"), 1.2);        // 提亮雨滴高光
-        gl.uniform1f(loc("u_aMult"), 30.0);    // 显著提高对比度，强制让雨滴显影
-        gl.uniform1f(loc("u_aSub"), 0.05);     // 降低扣除量，确保能看到水汽痕迹
-        gl.uniform1f(loc("u_ref"), 0.25);      // 降低折射率，防止背景因折射而过度变形
-
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-        requestAnimationFrame(this.loop.bind(this));
-    };
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(this.loop.bind(this));
+};
     window.addEventListener('load', () => {
         const container = document.getElementById('container');
         if(!container) return;
