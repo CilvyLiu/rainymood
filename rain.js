@@ -3,7 +3,7 @@
 (function() {
     const CONFIG = {
         gravity: 1200,          // 默认重力
-        trailDistance: [20, 35], 
+        trailDistance: [15, 45], 
         refraction: 0.5,         
         alphaMultiply: 20.0,    
         alphaSubtract: 0.1,     
@@ -176,7 +176,7 @@
 
         // 生成雨滴逻辑：联动 HTML 注入的 spawnChance 和 sizeRange
         if (Math.random() < this.spawnChance) {
-            const range = this.sizeRange || [12, 35];
+            const range = this.sizeRange || [12, 55];
             const randomSize = Math.random() * (range[1] - range[0]) + range[0];
             const xPos = Math.random() * this.waterCanvas.width;
             this.drops.push(new RainDrop(xPos, -100, randomSize, this.ratio, this));
