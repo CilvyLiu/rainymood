@@ -213,7 +213,7 @@
             for (let i = list.length - 1; i >= 0; i--) {
                 let d = list[i];
                 if (idx === 0) d.r -= dt * this.fadeSpeed;
-                else if (d.update(dt, this.waterCanvas.height)) {
+                else if (d.update(dt, this.waterCanvas.height, now)) { // 加上 now
                     this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.45, terminated: false });
                 }
                 
