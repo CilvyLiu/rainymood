@@ -186,21 +186,17 @@
         const dt = Math.min((now - this.lastTime) / 1000, 0.033);
         this.lastTime = now;
 
-        // 1. 随机生成：引入大小区间 [30, 80]，模拟附件中的 spawnSize
+        // 1. 生成逻辑：先计算随机 size 数值，再传给构造函数
         if (Math.random() < CONFIG.spawnInterval) {
-            const size = (Math.random() * 50 + 30); // 随机大小
-            const drop = new RainDrop(Math.random() * this.waterCanvas.width, -100, size, this.ratio);
-            
-            // 注入附件 raindrop.ts 中的随机运动参数
-            drop.shifting = (Math.random() - 0.5) * 120 * this.ratio; // 水平偏移力
-            drop.nextRandomTime = Math.random() * 2; // 随机动作频率
-            this.drops.push(drop);
+            const randomSize = Math.random() * 50 + 30; // 随机 30~80
+            const xPos = Math.random() * this.waterCanvas.width;
+            this.drops.push(new RainDrop(xPos, -100, randomSize, this.ratio));
         }
 
         const ctx = this.waterCtx;
         ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
-        // 2. 绘制静态拖尾（水痕）
+        // 2. 绘制静态拖尾
         for (let i = this.staticDrops.length - 1; i >= 0; i--) {
             let s = this.staticDrops[i];
             s.r -= dt * 2.5; 
@@ -208,36 +204,30 @@
             ctx.drawImage(this.dropShape, s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
         }
 
-        // 3. 绘制动态雨滴（带物理效果）
+        // 3. 绘制动态雨滴
         for (let i = this.drops.length - 1; i >= 0; i--) {
             let d = this.drops[i];
             
-            // 更新物理逻辑：增加水平摆动，不再直线下落
-            d.x += Math.sin(d.y * 0.02 + d.nextRandomTime) * d.shifting * dt * 0.5;
-            
+            // 物理更新
             if (d.update(dt, this.waterCanvas.height)) {
-                // 留下随机大小的拖尾
-                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * (Math.random() * 0.2 + 0.3) });
+                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.4 });
             }
-            
             if (d.terminated) { this.drops.splice(i, 1); continue; }
             
-            // 计算符合物理事实的拉伸：速度快则细长
+            // 计算拉伸
             const stretch = 1.2 + (d.velocity / 2000);
             const w = d.r * 2;
             const h = d.r * 2 * stretch;
 
-            // 绘制旋转的雨滴，使其方向始终指向运动方向
             ctx.save();
             ctx.translate(d.x, d.y);
-            // 计算运动倾角
-            const angle = Math.atan2(Math.sin(d.y * 0.02 + d.nextRandomTime) * d.shifting * 0.1, d.velocity);
-            ctx.rotate(-angle); 
+            // 即使是简单的下落，也加入微小的摆动倾角
+            ctx.rotate(Math.sin(d.y * 0.05) * 0.05); 
             ctx.drawImage(this.dropShape, -w / 2, -h / 2, w, h);
             ctx.restore();
         }
 
-        // WebGL 渲染部分
+        // --- WebGL 渲染管线 ---
         if (!this.backgroundLoaded) return requestAnimationFrame(t => this.loop(t));
 
         const gl = this.gl;
