@@ -3,11 +3,10 @@
 (function() {
     const CONFIG = {
         gravity: 1200,
-        trailDistance: [10, 35],
+        trailDistance: [10, 35], // 缩短间距使痕迹更细腻
         refraction: 0.5,
         alphaMultiply: 20.0,
         alphaSubtract: 0.1,
-        fogIntensity: 0.35, // 水汽浓度
     };
 
     class RainDrop {
@@ -19,7 +18,11 @@
             this.vy = 0;
             this.vx = 0;
             this.terminated = false;
+            
+            // 物理属性：小雨滴随风，大雨滴沉重
             this.windSensitivity = (1 / this.r) * 0.4 + 0.2; 
+            
+            // 轨迹逻辑：模拟玻璃表面的静摩擦力
             this.nextTrailDist = (Math.random() * 20 + 10) * ratio;
             this.lastTrailY = y;
             this.lastTrailX = x;
@@ -27,23 +30,32 @@
 
         update(dt, height, time) {
             const currentGravity = this.engine.customGravity || CONFIG.gravity;
+
+            // 1. 模拟阵风逻辑：长波低频 + 短波湍流
+            // 遵循一阵阵的规律，风速在 [-300, 600] 之间平滑波动
             const gust = Math.sin(time * 0.0004) * 350 + Math.sin(time * 0.0011) * 100;
             const windForce = gust * this.windSensitivity;
 
+            // 2. 模拟终端速度 (Terminal Velocity)
+            // mg = kv^2，当下落速度增加，空气阻力快速上升
             const terminalVelocity = 900 + this.r * 15;
             const resistance = (this.vy / terminalVelocity);
             const netAccel = currentGravity * (1 - resistance * resistance);
 
             this.vy += netAccel * dt;
+            // 风速惯性衰减：雨滴不会瞬间改变方向，而是平滑转向
             this.vx += (windForce - this.vx * 0.8) * dt; 
 
+            // 3. 线性运动位移（移除波浪摆动，回归力学正确）
             this.y += this.vy * dt;
             this.x += this.vx * dt;
 
+            // 4. 模拟玻璃表面附着与破碎残迹
             const distMoved = Math.hypot(this.y - this.lastTrailY, this.x - this.lastTrailX);
             if (distMoved > this.nextTrailDist) {
                 this.lastTrailY = this.y;
                 this.lastTrailX = this.x;
+                // 玻璃表面不均匀，随机化下次留痕距离
                 this.nextTrailDist = (Math.random() * 25 + 5) * this.engine.ratio;
                 return true; 
             }
@@ -62,15 +74,20 @@
         this.staticDrops = [];
         this.lastTime = 0;
         this.backgroundLoaded = false;
-        this.spawnChance = 0.15; 
+        
+        this.spawnChance = 0.12; // 增加密度
         this.sizeRange = [10, 30];
-        this.fadeSpeed = 1.8; 
+        this.fadeSpeed = 1.8; // 残迹消失稍慢，增加氛围
+        this.ratio = window.devicePixelRatio || 1;
     }
 
     RainRenderer.prototype.resize = function() {
         this.ratio = window.devicePixelRatio || 1;
-        this.canvas.width = window.innerWidth * this.ratio;
-        this.canvas.height = window.innerHeight * this.ratio;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        this.canvas.width = w * this.ratio;
+        this.canvas.height = h * this.ratio;
+        
         if (!this.waterCanvas) {
             this.waterCanvas = document.createElement('canvas');
             this.waterCtx = this.waterCanvas.getContext('2d');
@@ -86,18 +103,23 @@
         canvas.width = canvas.height = size;
         const ctx = canvas.getContext('2d');
         const img = ctx.createImageData(size, size);
+        
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
                 let dx = (x - 32) / 32;
                 let dy = (y - 32) / 32;
-                let dist = Math.sqrt(dx * dx + dy * dy * (dy > 0 ? 0.85 : 1.2)); 
+                
+                // 物理仿真：受重力拉扯，重心下移的馒头形 (dy > 0 时 dist 增加慢)
+                let dist = Math.sqrt(dx * dx * 1.0 + dy * dy * (dy > 0 ? 0.85 : 1.2)); 
+                
                 let i = (y * size + x) * 4;
                 if (dist <= 0.8) {
                     let f = Math.pow(1.0 - dist / 0.8, 1.5);
+                    // R, G 存储法线图信息：模拟平凸透镜折射
                     img.data[i] = (dx * 0.7 + 0.5) * 255;   
                     img.data[i+1] = (dy * 0.7 + 0.5) * 255; 
-                    img.data[i+2] = f * 255;               
-                    img.data[i+3] = f * 255;               
+                    img.data[i+2] = f * 255; // 高光亮度               
+                    img.data[i+3] = f * 255; // 遮罩
                 }
             }
         }
@@ -115,40 +137,37 @@
             precision mediump float;
             uniform sampler2D u_bg, u_water;
             uniform vec2 u_res, u_bgRes;
-            uniform float u_ref, u_aMult, u_aSub, u_fog;
+            uniform float u_ref, u_aMult, u_aSub;
             varying vec2 v;
             void main() {
                 vec2 s = u_res / u_bgRes;
                 float scale = max(s.x, s.y);
                 vec2 uv = (v - 0.5) * (s / scale) + 0.5;
-                
                 vec4 water = texture2D(u_water, v);
                 vec2 offset = (water.rg - 0.5) * u_ref * water.b;
-                
                 vec4 bg = texture2D(u_bg, uv + offset);
-                
-                // 水汽效果：混合背景和淡蓝色雾气
-                vec3 fogCol = vec3(0.9, 0.95, 1.0);
                 float alpha = clamp(water.a * u_aMult - u_aSub, 0.0, 1.0);
-                
-                // 洗刷逻辑：雨滴覆盖的地方(alpha > 0)，fog 效果降低
-                float fogAmt = u_fog * (1.0 - alpha);
-                vec3 scene = mix(bg.rgb, fogCol, fogAmt);
-                
-                gl_FragColor = vec4(scene + pow(water.b, 2.5) * 0.4, 1.0);
+                // 增加高光部分的对比度，增强质感
+                gl_FragColor = mix(bg, bg + pow(water.b, 2.5) * 0.4, alpha);
             }
         `;
 
         const prog = gl.createProgram();
         const shader = (t, s) => { 
-            const h = gl.createShader(t); gl.shaderSource(h, s); gl.compileShader(h); gl.attachShader(prog, h); 
+            const h = gl.createShader(t); 
+            gl.shaderSource(h, s); 
+            gl.compileShader(h); 
+            gl.attachShader(prog, h); 
         };
-        shader(gl.VERTEX_SHADER, vs); shader(gl.FRAGMENT_SHADER, fs);
-        gl.linkProgram(prog); gl.useProgram(prog);
+        shader(gl.VERTEX_SHADER, vs); 
+        shader(gl.FRAGMENT_SHADER, fs);
+        gl.linkProgram(prog); 
+        gl.useProgram(prog);
         this.prog = prog;
 
         this.texBg = gl.createTexture();
         this.texWater = gl.createTexture();
+
         gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
         const p = gl.getAttribLocation(prog, 'p');
@@ -193,8 +212,10 @@
                 let d = list[i];
                 if (idx === 0) d.r -= dt * this.fadeSpeed;
                 else if (d.update(dt, this.waterCanvas.height, now)) {
+                    // 只有运动中的雨滴留下“破碎”的静止残迹
                     this.staticDrops.push({ x: d.x, y: d.y, r: d.r * (Math.random() * 0.2 + 0.3), terminated: false });
                 }
+                
                 if (d.terminated || d.r < 0.5) { list.splice(i, 1); continue; }
 
                 ctx.save();
@@ -202,11 +223,12 @@
                 if (idx === 1) {
                     const angle = Math.atan2(d.vy, d.vx);
                     ctx.rotate(angle - Math.PI / 2);
+                    // 仅在大速度下产生极其轻微的纵向拉伸，保持球极形态
                     const speed = Math.sqrt(d.vx * d.vx + d.vy * d.vy);
                     const stretch = Math.min(speed * 0.03, d.r * 0.5);
                     ctx.drawImage(this.dropShape, -d.r, -d.r, d.r * 2, (d.r + stretch) * 2);
                 } else {
-                    ctx.globalAlpha = 0.5;
+                    ctx.globalAlpha = 0.5; // 静态残迹更透明
                     ctx.drawImage(this.dropShape, -d.r, -d.r, d.r * 2, d.r * 2);
                 }
                 ctx.restore();
@@ -220,6 +242,8 @@
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.texBg);
@@ -232,7 +256,6 @@
         gl.uniform1f(loc("u_ref"), CONFIG.refraction);
         gl.uniform1f(loc("u_aMult"), CONFIG.alphaMultiply);
         gl.uniform1f(loc("u_aSub"), CONFIG.alphaSubtract);
-        gl.uniform1f(loc("u_fog"), CONFIG.fogIntensity);
 
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         requestAnimationFrame(t => this.loop(t));
@@ -241,6 +264,7 @@
     window.addEventListener('load', () => {
         const renderer = new RainRenderer(document.getElementById('container'));
         window.rainEngine = renderer;
+        renderer.init();
     });
 
     window.addEventListener('resize', () => {
