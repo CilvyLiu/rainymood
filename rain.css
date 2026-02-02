@@ -237,21 +237,32 @@ body, html {
     transform: translateY(-1px) scale(1.02);
 }
 
-/* --- 关闭瞬间的抖动动画 (Jolt) --- */
+/* --- 虽然名字叫 alert-jolt，但内容已改为冥想呼吸模式 --- */
 @keyframes alert-jolt {
-    0% { transform: translate(0,0); filter: hue-rotate(0deg); }
-    25% { transform: translate(-3px, 1.5px); }
-    50% { transform: translate(3px, -1.5px); filter: brightness(2); }
-    75% { transform: translate(-3px, -1.5px); }
-    100% { transform: translate(0,0); }
+    0%, 100% { 
+        box-shadow: 0 0 10px rgba(125, 211, 252, 0.2); 
+        border-color: rgba(125, 211, 252, 0.2);
+        filter: brightness(0.8);
+        transform: scale(1);
+    }
+    50% { 
+        /* 缓慢扩张，柔和的荧光蓝 */
+        box-shadow: 0 0 35px rgba(125, 211, 252, 0.6), inset 0 0 15px rgba(125, 211, 252, 0.3); 
+        border-color: rgba(125, 211, 252, 0.8); 
+        filter: brightness(1.2);
+        transform: scale(1.02); /* 微微胀大，像吸气 */
+    }
 }
 
+/* --- 调整对应的类：让它慢下来 --- */
 .btn-alert {
-    background: rgba(125, 211, 252, 0.3) !important;
+    background: rgba(0, 0, 0, 0.6) !important; /* 深邃的背景 */
     border-color: #7dd3fc !important;
-    box-shadow: 0 0 40px #7dd3fc, inset 0 0 20px #7dd3fc !important;
-    animation: alert-jolt 0.12s linear infinite !important; /* 极高频抖动 */
-    color: #fff !important;
+    /* 核心修改：将 0.12s 极速改为 4s 的深呼吸节奏 */
+    animation: alert-jolt 4s ease-in-out infinite !important; 
+    color: #7dd3fc !important;
+    text-shadow: 0 0 10px rgba(125, 211, 252, 0.5);
+    letter-spacing: 6px !important; /* 增加字间距，视觉更空灵 */
 }
 /* 底部控制栏 */
 .bottom-bar {
