@@ -11,38 +11,65 @@
     };
 
     class RainDrop {
-        constructor(x, y, size, ratio, engine) {
-            this.engine = engine; // 引用引擎以获取动态参数
-            this.x = x;
-            this.y = y;
-            this.r = size * ratio; 
-            this.velocity = 0; 
-            this.terminated = false;
-            this.lastTrailY = y;
-            this.shifting = (Math.random() - 0.5) * (size * 0.15); 
-            this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
-        }
+    constructor(x, y, size, ratio, engine) {
+        this.engine = engine;
+        this.x = x;
+        this.y = y;
+        this.r = size * ratio; 
+        
+        // 核心改动：引入双轴速度，实现“飘逸”
+        this.vy = 0; // 纵向速度
+        this.vx = 0; // 横向风力感
+        
+        this.terminated = false;
+        this.lastTrailY = y;
+        this.lastTrailX = x; // 记录轨迹的横坐标
 
-        update(dt, height) {
-            // 联动 HTML 传回的 customGravity，实现不同天气的速度感
-            const currentGravity = this.engine.customGravity || CONFIG.gravity;
-            const friction = 0.005 * this.r;
-            const accel = currentGravity - (this.velocity * friction);
-            
-            this.velocity += accel * dt;
-            this.y += this.velocity * dt;
-            
-            // 左右微摆
-            this.x += Math.sin(this.y * 0.06) * (this.shifting * dt);
-
-            if (this.y - this.lastTrailY > this.nextTrailDist) {
-                this.lastTrailY = this.y;
-                return true; 
-            }
-            if (this.y > height + 100) this.terminated = true;
-            return false;
-        }
+        // 随机特性：每一滴雨对风的敏感度不同
+        this.windSensitivity = Math.random() * 0.5 + 0.8; 
+        this.shifting = (Math.random() - 0.5) * (size * 0.4); 
+        this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
     }
+
+    update(dt, height) {
+        const currentGravity = this.engine.customGravity || CONFIG.gravity;
+        
+        // --- 1. 风力逻辑 (Wind Vector) ---
+        // 假设风向向右。暴雨天气风更大。
+        const baseWind = this.engine.spawnChance > 0.5 ? 600 : 200; 
+        const windAccel = baseWind * this.windSensitivity;
+        
+        // 模拟空气阻力和重力平衡
+        const friction = 0.003 * this.r;
+        const ay = currentGravity - (this.vy * friction);
+        
+        this.vy += ay * dt;
+        this.vx += windAccel * dt - (this.vx * friction); // 风力加速度
+
+        // --- 2. 飘逸位移 (Drift) ---
+        this.y += this.vy * dt;
+        this.x += this.vx * dt;
+        
+        // 增加更不规则的左右晃动，模拟水珠在玻璃上因附着力不均产生的“扭动”
+        this.x += Math.sin(this.y * 0.04) * (this.shifting * dt);
+
+        // --- 3. 拖尾判定 (Trail) ---
+        // 计算勾股定理位移，而不是简单的 Y 轴位移
+        const distMoved = Math.sqrt(Math.pow(this.y - this.lastTrailY, 2) + Math.pow(this.x - this.lastTrailX, 2));
+
+        if (distMoved > this.nextTrailDist) {
+            this.lastTrailY = this.y;
+            this.lastTrailX = this.x;
+            return true; 
+        }
+
+        // 边缘销毁：如果飘出屏幕也算终止
+        if (this.y > height + 100 || this.x > window.innerWidth * window.devicePixelRatio + 100) {
+            this.terminated = true;
+        }
+        return false;
+    }
+}
 
     function RainRenderer(container) {
         this.container = container;
