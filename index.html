@@ -10,6 +10,12 @@
         #container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; background-color: #000; }
         #overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.4) 100%); }
         .side-nav, .center-container, .bottom-bar { z-index: 100 !important; }
+
+        /* 核心校准：确保 rain.css 里的动画能生效 */
+        .rule-card { 
+            display: none; 
+            animation: breathing 8s ease-in-out infinite !important; 
+        }
     </style>
 </head>
 <body onclick="initAudio()">
@@ -142,32 +148,29 @@
             }
         };
 
-        // --- 核心物理表：控制尺寸、速度与擦除速度 ---
         window.changeWeather = function() {
             const weather = document.getElementById('weatherSelect').value;
             if (window.rainEngine) {
                 const weatherMap = {
-                    // drizzle: 细小，挂壁时间长 (fade: 0.8)
                     drizzle: { chance: 0.1, size: [12, 25], fade: 0.8, gravity: 800 },
-                    // rain: 标准
                     rain:    { chance: 0.3, size: [20, 40], fade: 2.5, gravity: 1200 },
-                    // storm: 较大，消失快
                     storm:   { chance: 0.6, size: [30, 55], fade: 5.0, gravity: 1800 },
-                    // mega: 超高频率，冲刷极快 (fade: 12.0)，视觉震撼
                     mega:    { chance: 0.95, size: [40, 65], fade: 12.0, gravity: 2800 }
                 };
                 const opt = weatherMap[weather];
                 window.rainEngine.spawnChance = opt.chance;
                 window.rainEngine.sizeRange = opt.size;
                 window.rainEngine.fadeSpeed = opt.fade;
-                window.rainEngine.customGravity = opt.gravity; // 联动重力
+                window.rainEngine.customGravity = opt.gravity; 
             }
         };
 
         function toggleRules(e) {
             e.stopPropagation();
             const card = document.getElementById('mainRule');
-            card.style.display = (card.style.display === 'none') ? 'block' : 'none';
+            // 修正判断逻辑：处理初次加载为空字符串的情况
+            const isHidden = card.style.display === 'none' || card.style.display === '';
+            card.style.display = isHidden ? 'block' : 'none';
         }
 
         function updateClock() {
