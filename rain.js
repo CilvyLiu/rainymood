@@ -217,18 +217,19 @@
     const dt = Math.min((now - this.lastTime) / 1000, 0.033);
     this.lastTime = now;
 
-    // 1. 生成雨滴逻辑
+    // 1. 生成雨滴逻辑 (考虑到风，让雨滴有概率从屏幕左侧飘入)
     if (Math.random() < this.spawnChance) {
         const range = this.sizeRange || [12, 55];
         const randomSize = Math.random() * (range[1] - range[0]) + range[0];
-        const xPos = Math.random() * this.waterCanvas.width;
+        // 增加生成范围，防止右侧风大时出现空白区
+        const xPos = Math.random() * (this.waterCanvas.width + 400 * this.ratio) - 200 * this.ratio;
         this.drops.push(new RainDrop(xPos, -100, randomSize, this.ratio, this));
     }
 
     const ctx = this.waterCtx;
     ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
-    // 2. 残留水珠擦除逻辑 (物理增强：非等比缩放 + 不规则倾斜)
+    // 2. 残留水迹逻辑 (让“尾巴”顺着风向撕裂)
     for (let i = this.staticDrops.length - 1; i >= 0; i--) {
         let s = this.staticDrops[i];
         s.r -= dt * (this.fadeSpeed || 2.5); 
@@ -236,53 +237,59 @@
 
         ctx.save();
         ctx.translate(s.x, s.y);
-        // 【物理修正】：残留水珠不是圆的，而是扁平或拉长的水渍
-        // 使用 s.phase (如果没定义就初始化) 来保持每一滴水珠独特的变形比
-        if(!s.scaleX) {
-            s.scaleX = 0.8 + Math.random() * 0.6;
-            s.scaleY = 0.7 + Math.random() * 0.4;
-            s.angle = (Math.random() - 0.5) * 0.8; 
+        
+        // 如果没有初始化角度和拉伸，赋予它物理特性
+        if(!s.angle) {
+            // 这里的 angle 应该继承自产生它的主雨滴
+            s.angle = s.initialAngle || 0.4; 
+            s.scaleX = 0.6 + Math.random() * 0.4;
+            s.scaleY = 1.5 + Math.random() * 2.0; // 重点：让残留物纵向撕裂，不再圆滚滚
         }
+        
         ctx.rotate(s.angle);
-        // 这里的 s.r * 2 * s.scaleX 让它彻底告别“圆滚滚”
+        ctx.globalAlpha = Math.min(1.0, s.r / 3.0); // 边缘更柔和
         ctx.drawImage(this.dropShape, -s.r * s.scaleX, -s.r * s.scaleY, s.r * 2 * s.scaleX, s.r * 2 * s.scaleY);
         ctx.restore();
     }
 
-    // 3. 主雨滴滑落逻辑 (物理增强：水量损耗 + 轨迹抖动)
+    // 3. 主雨滴滑落逻辑 (飘逸风效果 + 轨迹撕裂)
     for (let i = this.drops.length - 1; i >= 0; i--) {
         let d = this.drops[i];
         
+        // d.update 内部现在应该已经有了 vx, vy 的逻辑
         if (d.update(dt, this.waterCanvas.height)) {
-            // 【水量损耗】：滑行留下痕迹，自身半径缩小
-            d.r *= 0.97; 
+            d.r *= 0.96; // 产生拖尾会导致主滴水量损耗
 
-            // 【物理修正】：并不是每次更新都留下完美的圆，有时是细碎水花
-            if (Math.random() > 0.2) {
-                this.staticDrops.push({ 
-                    x: d.x + (Math.random() - 0.5) * 4, // 轨迹随机偏移
-                    y: d.y, 
-                    r: d.r * (Math.random() * 0.3 + 0.2) // 残留大小极度随机
-                });
-            }
+            // 【撕裂拖尾】：根据当前 vx 和 vy 计算滑行角度
+            const dropAngle = Math.atan2(d.vy, d.vx) - Math.PI/2;
+            
+            this.staticDrops.push({ 
+                x: d.x + (Math.random() - 0.5) * 4, 
+                y: d.y, 
+                r: d.r * (Math.random() * 0.3 + 0.2),
+                initialAngle: dropAngle // 记录产生瞬间的角度，让尾巴斜着躺下
+            });
         }
         
-        if (d.terminated || d.r < 2.0) { this.drops.splice(i, 1); continue; }
+        if (d.terminated || d.r < 1.5) { this.drops.splice(i, 1); continue; }
         
-        // 【物理修正】：主雨滴滑落时的拉伸感
-        const stretch = 1.3 + (d.velocity / 1800);
-        const w = d.r * 2 * (0.9 + Math.random() * 0.2); // 宽度微颤
-        const h = d.r * 2 * stretch;
+        // 【飘逸视觉】：计算实时的倾斜角度和拉伸倍率
+        const velocityTotal = Math.sqrt(d.vx * d.vx + d.vy * d.vy) || d.velocity;
+        const moveAngle = Math.atan2(d.vy, d.vx) - Math.PI/2;
+        const stretch = 1.5 + (velocityTotal / 1500);
 
         ctx.save();
         ctx.translate(d.x, d.y);
-        // 增加随速度变化的摆动
-        ctx.rotate(Math.sin(d.y * 0.05) * 0.08); 
+        ctx.rotate(moveAngle); // 顺着风向倾斜
+        
+        const w = d.r * 2 * (0.8 + Math.random() * 0.4); // 模拟空气阻力导致的形态抖动
+        const h = d.r * 2 * stretch;
+        
         ctx.drawImage(this.dropShape, -w / 2, -h / 2, w, h);
         ctx.restore();
     }
 
-    // 4. WebGL 渲染层 (保持不变)
+    // 4. WebGL 渲染层
     if (!this.backgroundLoaded) return requestAnimationFrame(t => this.loop(t));
     const gl = this.gl;
     gl.useProgram(this.prog);
