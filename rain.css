@@ -56,21 +56,20 @@
     letter-spacing: 1px;
 }
 
-/* --- 2. 呼吸律动核心动画 --- */
-/* --- 2. 呼吸律动核心动画（已优化为冥想荧光版） --- */
+/* --- 2. 呼吸律动核心动画（冥想荧光增强版） --- */
 @keyframes breathing {
     0%, 100% { 
-        /* 吸气末尾或呼气结束：光影收敛 */
+        /* 呼气尽头：光影收敛 */
         box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 10px rgba(125, 211, 252, 0.1); 
         border-color: rgba(125, 211, 252, 0.15);
         filter: drop-shadow(0 0 2px rgba(125, 211, 252, 0.05));
     }
     50% { 
-        /* 呼气最深处：光影绽放，淡淡荧光 */
-        box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 0 30px rgba(125, 211, 252, 0.25); 
-        border-color: rgba(125, 211, 252, 0.5); /* 边框稍稍亮起 */
-        /* 关键：增加多重滤镜模拟荧光灯管感 */
-        filter: drop-shadow(0 0 8px rgba(125, 211, 252, 0.3)) brightness(1.1);
+        /* 吸气深处：淡淡荧光绽放 */
+        box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 0 30px rgba(125, 211, 252, 0.3); 
+        border-color: rgba(125, 211, 252, 0.5); /* 边框亮起 */
+        /* 引入多重滤镜模拟发光感 */
+        filter: drop-shadow(0 0 10px rgba(125, 211, 252, 0.4)) brightness(1.1);
     }
 }
 
@@ -163,21 +162,21 @@ body, html {
 
 .rule-card {
     display: none; 
-    background: rgba(0,0,0,0.7); 
+    background: rgba(0,0,0,0.75); 
     color: #fff;
     padding: 35px; 
-    border-radius: 8px; 
-    border: 1px solid rgba(255,255,255,0.15);
-    backdrop-filter: blur(15px); 
-    -webkit-backdrop-filter: blur(15px);
+    border-radius: 12px; 
+    border: 1px solid rgba(125, 211, 252, 0.2);
+    backdrop-filter: blur(20px); 
+    -webkit-backdrop-filter: blur(20px);
     margin-bottom: 30px; 
     text-align: left;
     box-shadow: 0 20px 50px rgba(0,0,0,0.8);
     
-    /* 组合动画：入场 + 持续呼吸 */
+    /* 组合动画：入场 (0.8s) + 持续冥想呼吸 (12s) */
     animation: 
-        fadeInBlur 0.6s cubic-bezier(0.2, 0, 0.2, 1), 
-        breathing 8s ease-in-out infinite;
+        fadeInBlur 0.8s cubic-bezier(0.2, 0, 0.2, 1) forwards, 
+        breathing 12s ease-in-out 0.8s infinite;
 }
 
 @keyframes fadeInBlur {
@@ -193,9 +192,10 @@ body, html {
     text-align: center;
     margin: 0 0 25px 0;
     font-weight: 500;
-    color: #fff;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: #f0f9ff;
+    border-bottom: 1px solid rgba(125, 211, 252, 0.2);
     padding-bottom: 15px;
+    text-shadow: 0 0 10px rgba(125, 211, 252, 0.3);
 }
 
 .rule-card p {
@@ -208,11 +208,11 @@ body, html {
 }
 
 .rule-card b {
-    color: #a5f3fc; 
+    color: #7dd3fc; 
     font-family: "Georgia", serif;
     margin-right: 8px;
     font-weight: 400;
-    text-shadow: 0 0 8px rgba(165, 243, 252, 0.4);
+    text-shadow: 0 0 10px rgba(125, 211, 252, 0.6);
 }
 
 /* 激活按钮 */
