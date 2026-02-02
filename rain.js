@@ -2,47 +2,57 @@
 
 (function() {
     const CONFIG = {
-        gravity: 2400,
+        gravity: 1200,
         trailDistance: [20, 35], 
         refraction: 0.5,         
         alphaMultiply: 20.0,    
         alphaSubtract: 0.1,     
-        spawnInterval: 0.1,    
+        spawnInterval: 0.08,    
     };
 
     class RainDrop {
         constructor(x, y, size, ratio) {
             this.x = x;
             this.y = y;
-            // 核心 1：这里接收生成的随机大小
+            // 核心 1：控制初始大小（ratio 随设备像素比缩放）
             this.r = size * ratio; 
-            this.velocity = 0;
+            
+            // 初始速度设为 0，让它有一个从静止到滑落的加速过程
+            this.velocity = 0; 
             this.terminated = false;
             this.lastTrailY = y;
-            // 物理特性：大雨滴摆动幅度略大
-            this.shifting = (Math.random() - 0.5) * (size * 0.2); 
+            
+            // 物理特性：shifting 决定左右晃动的剧烈程度
+            this.shifting = (Math.random() - 0.5) * (size * 0.15); 
+            
+            // 下落多少距离留下一个水痕
             this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
         }
 
         update(dt, height) {
-            // 物理 1：增加阻力感，让下落不那么线性
-            const resistance = 0.005 * this.r; 
-            const accel = CONFIG.gravity - (this.velocity * resistance);
+            // --- 解决“太快”的关键物理公式 ---
+            // 增加摩擦力(0.005 * this.r)，雨滴越大阻力越大，达到平衡速度后不再无限加速
+            const friction = 0.005 * this.r;
+            const accel = CONFIG.gravity - (this.velocity * friction);
             
             this.velocity += accel * dt;
             this.y += this.velocity * dt;
             
-            // 物理 2：让路径微微晃动，不再“太直”
-            this.x += Math.sin(this.y * 0.05) * (this.shifting * dt);
+            // --- 解决“太直”的晃动逻辑 ---
+            // 使用正弦函数让 x 坐标随 y 坐标微小摆动，0.06 是摆动频率
+            this.x += Math.sin(this.y * 0.06) * (this.shifting * dt);
 
+            // 检查是否需要留下拖尾痕迹
             if (this.y - this.lastTrailY > this.nextTrailDist) {
                 this.lastTrailY = this.y;
                 return true; 
             }
+            
+            // 超出屏幕底部则销毁
             if (this.y > height + 100) this.terminated = true;
             return false;
         }
-    } // RainDrop 类结束
+    }
 
     function RainRenderer(container) {
         this.container = container;
@@ -168,8 +178,8 @@
 
         // 核心 2：颗粒大小随机改这里
         if (Math.random() < CONFIG.spawnInterval) {
-            const minSize = 25; // 最小颗粒
-            const maxSize = 85; // 最大颗粒
+            const minSize = 12; // 最小颗粒
+            const maxSize = 35; // 最大颗粒
             const randomSize = Math.random() * (maxSize - minSize) + minSize;
             
             const xPos = Math.random() * this.waterCanvas.width;
