@@ -45,10 +45,10 @@
         </div>
         
         <select id="weatherSelect" onchange="changeWeather()">
+            <option value="drizzle">🌦️ 阵雨</option>
             <option value="rain">🌧️ 细雨</option>
             <option value="storm">⛈️ 暴雨</option>
-            <option value="drizzle">🌦️ 阵雨</option>
-            <option value="sunny">☀️ 晴朗</option>
+            <option value="mega">🌪️ 超大暴雨</option>
         </select>
 
         <select id="sceneSelect" onchange="changeScene(this.value)">
@@ -70,7 +70,6 @@
         const asc = document.getElementById('audio_scene');
         const pbtn = document.getElementById('pbtn');
 
-        // --- 联动映射表 ---
         const SCENE_ASSETS = {
             'pensive.png':  { audio: 'train.mp3' },
             'train.png':    { audio: 'window_rain.mp3' },
@@ -104,7 +103,6 @@
             abg.volume = asc.volume = v; 
         }
 
-        // 场景切换逻辑
         window.changeScene = function(val) {
             if (window.rainEngine) {
                 window.rainEngine.updateBackground(val);
@@ -116,20 +114,25 @@
             }
         };
 
-        // 天气联动逻辑
+        // --- 核心物理表：控制尺寸、速度与擦除速度 ---
         window.changeWeather = function() {
             const weather = document.getElementById('weatherSelect').value;
             if (window.rainEngine) {
                 const weatherMap = {
-                    rain:    { chance: 0.3, size: [30, 60] },
-                    storm:   { chance: 0.8, size: [60, 110] },
-                    drizzle: { chance: 0.1, size: [15, 35] },
-                    sunny:   { chance: 0,   size: [0, 0] }
+                    // drizzle: 细小，挂壁时间长 (fade: 0.8)
+                    drizzle: { chance: 0.1, size: [12, 25], fade: 0.8, gravity: 800 },
+                    // rain: 标准
+                    rain:    { chance: 0.3, size: [20, 40], fade: 2.5, gravity: 1200 },
+                    // storm: 较大，消失快
+                    storm:   { chance: 0.6, size: [30, 55], fade: 5.0, gravity: 1800 },
+                    // mega: 超高频率，冲刷极快 (fade: 12.0)，视觉震撼
+                    mega:    { chance: 0.95, size: [40, 65], fade: 12.0, gravity: 2800 }
                 };
                 const opt = weatherMap[weather];
-                // 关键：将参数注入到 window.rainEngine
                 window.rainEngine.spawnChance = opt.chance;
                 window.rainEngine.sizeRange = opt.size;
+                window.rainEngine.fadeSpeed = opt.fade;
+                window.rainEngine.customGravity = opt.gravity; // 联动重力
             }
         };
 
