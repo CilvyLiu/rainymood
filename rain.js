@@ -122,46 +122,45 @@
     };
 
     RainRenderer.prototype.createDropShape = function() {
-        const size = 64;
-        const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        const img = ctx.createImageData(size, size);
-        
-        for (let y = 0; y < size; y++) {
-            for (let x = 0; x < size; x++) {
-                // 1. 归一化坐标 (-1 到 1)
-                let dx = (x - 32) / 32;
-                let dy = (y - 32) / 32;
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    
+    // 随机因子：让每个像素的判断都带有一点点不规则抖动
+    const noise = () => (Math.random() - 0.5) * 0.15;
 
-                // 2. 物理模拟：梨形偏移
-                // 通过修改 dy，让下半部分（dy > 0）比上半部分更饱满
-                // 模拟重力导致水珠重心下移
-                let dropShape = dy > 0 ? dy * 0.8 : dy * 1.2; 
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            let dx = (x - 32) / 32;
+            let dy = (y - 32) / 32;
+
+            // 物理学：模拟附着力。水滴顶部受牵引变窄，底部受重力堆积
+            // 引入扰动，让左右不对称，打破规律感
+            let stretch = dy > 0 ? 0.85 + noise() : 1.15 + noise();
+            
+            // 加入一个横向的挤压随机值
+            let skew = dx + (dy * 0.1); 
+            
+            let dist = Math.sqrt(skew * skew * 1.2 + dy * dy * stretch);
+
+            let i = (y * size + x) * 4;
+            // 边缘不再是硬着陆，而是带有扩散感的张力层
+            if (dist <= 1.0) {
+                let f = Math.pow(1.0 - dist, 1.5); // 稍微硬一点的边缘，更像水滴
                 
-                // 3. 纵向拉伸因子
-                // 这里的 0.9 让宽度收缩，使其看起来略微椭圆
-                let dist = Math.sqrt(dx * dx / 0.9 + dropShape * dropShape);
-
-                let i = (y * size + x) * 4;
-                if (dist <= 1.0) {
-                    // 4. 边缘平滑与折射强度
-                    let f = Math.pow(1.0 - dist, 2);
-                    
-                    // RG 通道控制折射偏移（由原本的中心对称改为略微向下偏移）
-                    img.data[i] = (dx * 0.5 + 0.5) * 255;   
-                    img.data[i+1] = (dy * 0.3 + 0.7) * 255; // Y方向折射偏移向下倾斜
-                    
-                    // B 通道控制高光强度，A 通道控制透明度
-                    img.data[i+2] = f * 255;               
-                    img.data[i+3] = f * 255;               
-                }
+                // 关键：模拟水滴内部的非均匀折射
+                img.data[i] = (dx * 0.45 + 0.55) * 255;   
+                img.data[i+1] = (dy * 0.35 + 0.65) * 255; 
+                img.data[i+2] = f * 255;               
+                img.data[i+3] = f * 220; // 稍微降低一点透明度，增加厚重感
             }
         }
-        ctx.putImageData(img, 0, 0);
-        return canvas;
-    };
-
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas;
+};
     RainRenderer.prototype.resize = function() {
         this.width = window.innerWidth;
         this.height = window.innerHeight;
@@ -187,87 +186,97 @@
         img.src = url;
     };
 
-    RainRenderer.prototype.loop = function(now) {
-        const dt = Math.min((now - this.lastTime) / 1000, 0.033);
-        this.lastTime = now;
+   RainRenderer.prototype.loop = function(now) {
+    const dt = Math.min((now - this.lastTime) / 1000, 0.033);
+    this.lastTime = now;
 
-        // 生成雨滴逻辑：联动 HTML 注入的 spawnChance 和 sizeRange
-        if (Math.random() < this.spawnChance) {
-            const range = this.sizeRange || [12, 55];
-            const randomSize = Math.random() * (range[1] - range[0]) + range[0];
-            const xPos = Math.random() * this.waterCanvas.width;
-            this.drops.push(new RainDrop(xPos, -100, randomSize, this.ratio, this));
+    // 1. 生成雨滴逻辑
+    if (Math.random() < this.spawnChance) {
+        const range = this.sizeRange || [12, 55];
+        const randomSize = Math.random() * (range[1] - range[0]) + range[0];
+        const xPos = Math.random() * this.waterCanvas.width;
+        this.drops.push(new RainDrop(xPos, -100, randomSize, this.ratio, this));
+    }
+
+    const ctx = this.waterCtx;
+    ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
+
+    // 2. 残留水珠擦除逻辑 (物理增强：非等比缩放 + 不规则倾斜)
+    for (let i = this.staticDrops.length - 1; i >= 0; i--) {
+        let s = this.staticDrops[i];
+        s.r -= dt * (this.fadeSpeed || 2.5); 
+        if (s.r < 0.5) { this.staticDrops.splice(i, 1); continue; }
+
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        // 【物理修正】：残留水珠不是圆的，而是扁平或拉长的水渍
+        // 使用 s.phase (如果没定义就初始化) 来保持每一滴水珠独特的变形比
+        if(!s.scaleX) {
+            s.scaleX = 0.8 + Math.random() * 0.6;
+            s.scaleY = 0.7 + Math.random() * 0.4;
+            s.angle = (Math.random() - 0.5) * 0.8; 
         }
+        ctx.rotate(s.angle);
+        // 这里的 s.r * 2 * s.scaleX 让它彻底告别“圆滚滚”
+        ctx.drawImage(this.dropShape, -s.r * s.scaleX, -s.r * s.scaleY, s.r * 2 * s.scaleX, s.r * 2 * s.scaleY);
+        ctx.restore();
+    }
 
-        const ctx = this.waterCtx;
-        ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
-
-        // 擦除逻辑：联动 fadeSpeed，实现暴雨快擦、细雨慢擦
-        for (let i = this.staticDrops.length - 1; i >= 0; i--) {
-            let s = this.staticDrops[i];
-            s.r -= dt * (this.fadeSpeed || 2.5); 
-            if (s.r < 0.5) { this.staticDrops.splice(i, 1); continue; }
-            ctx.drawImage(this.dropShape, s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
-        }
-
-        for (let i = this.drops.length - 1; i >= 0; i--) {
-            let d = this.drops[i];
-            
-            // 1. 核心更新逻辑
-            // d.update 返回 true 表示达到了 trailDistance，该留下一滴残留水珠了
-            if (d.update(dt, this.waterCanvas.height)) {
-                
-                // 【物理改动 A】：由于主雨滴留下了残留水珠，它自身的体积（半径）应该轻微缩小
-                // 模拟“水量损耗”，这样雨滴滑到后面会变小变快
-                d.r *= 0.98; 
+    // 3. 主雨滴滑落逻辑 (物理增强：水量损耗 + 轨迹抖动)
+    for (let i = this.drops.length - 1; i >= 0; i--) {
+        let d = this.drops[i];
         
-                // 【物理改动 B】：残留水珠（StaticDrops）的随机化
-                // 以前是固定的 0.2 倍。现在让它在 0.3 到 0.6 之间随机。
-                // 体积较大的水珠会让梨形效果在视觉上更明显。
-                const staticR = d.r * (Math.random() * 0.3 + 0.3);
-                
+        if (d.update(dt, this.waterCanvas.height)) {
+            // 【水量损耗】：滑行留下痕迹，自身半径缩小
+            d.r *= 0.97; 
+
+            // 【物理修正】：并不是每次更新都留下完美的圆，有时是细碎水花
+            if (Math.random() > 0.2) {
                 this.staticDrops.push({ 
-                    x: d.x + (Math.random() - 0.5) * 2, // 增加微小的位置偏移，打破直线感
+                    x: d.x + (Math.random() - 0.5) * 4, // 轨迹随机偏移
                     y: d.y, 
-                    r: staticR 
+                    r: d.r * (Math.random() * 0.3 + 0.2) // 残留大小极度随机
                 });
             }
-            if (d.terminated) { this.drops.splice(i, 1); continue; }
-            
-            const stretch = 1.2 + (d.velocity / 2000);
-            const w = d.r * 2;
-            const h = d.r * 2 * stretch;
-
-            ctx.save();
-            ctx.translate(d.x, d.y);
-            ctx.rotate(Math.sin(d.y * 0.05) * 0.05); 
-            ctx.drawImage(this.dropShape, -w / 2, -h / 2, w, h);
-            ctx.restore();
         }
+        
+        if (d.terminated || d.r < 2.0) { this.drops.splice(i, 1); continue; }
+        
+        // 【物理修正】：主雨滴滑落时的拉伸感
+        const stretch = 1.3 + (d.velocity / 1800);
+        const w = d.r * 2 * (0.9 + Math.random() * 0.2); // 宽度微颤
+        const h = d.r * 2 * stretch;
 
-        if (!this.backgroundLoaded) return requestAnimationFrame(t => this.loop(t));
+        ctx.save();
+        ctx.translate(d.x, d.y);
+        // 增加随速度变化的摆动
+        ctx.rotate(Math.sin(d.y * 0.05) * 0.08); 
+        ctx.drawImage(this.dropShape, -w / 2, -h / 2, w, h);
+        ctx.restore();
+    }
 
-        const gl = this.gl;
-        gl.useProgram(this.prog);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, this.texWater);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
+    // 4. WebGL 渲染层 (保持不变)
+    if (!this.backgroundLoaded) return requestAnimationFrame(t => this.loop(t));
+    const gl = this.gl;
+    gl.useProgram(this.prog);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.texBg);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.texWater);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
 
-        const loc = (n) => gl.getUniformLocation(this.prog, n);
-        gl.uniform1i(loc("u_bg"), 0);    
-        gl.uniform1i(loc("u_water"), 1); 
-        gl.uniform2f(loc("u_res"), this.canvas.width, this.canvas.height);
-        gl.uniform2f(loc("u_bgRes"), this.bgImage.width, this.bgImage.height);
-        gl.uniform1f(loc("u_ref"), CONFIG.refraction);
-        gl.uniform1f(loc("u_aMult"), CONFIG.alphaMultiply);
-        gl.uniform1f(loc("u_aSub"), CONFIG.alphaSubtract);
+    const loc = (n) => gl.getUniformLocation(this.prog, n);
+    gl.uniform1i(loc("u_bg"), 0);    
+    gl.uniform1i(loc("u_water"), 1); 
+    gl.uniform2f(loc("u_res"), this.canvas.width, this.canvas.height);
+    gl.uniform2f(loc("u_bgRes"), this.bgImage.width, this.bgImage.height);
+    gl.uniform1f(loc("u_ref"), CONFIG.refraction);
+    gl.uniform1f(loc("u_aMult"), CONFIG.alphaMultiply);
+    gl.uniform1f(loc("u_aSub"), CONFIG.alphaSubtract);
 
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        requestAnimationFrame(t => this.loop(t));
-    };
-
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(t => this.loop(t));
+};
     window.addEventListener('load', () => {
         const container = document.getElementById('container');
         if(!container) return;
