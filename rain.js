@@ -1,14 +1,13 @@
 'use strict';
 
 (function() {
-    // 1. 物理参数：参考 simulator.ts
     const CONFIG = {
         gravity: 2400,
         trailDistance: [20, 35], 
         refraction: 0.5,        
-        alphaMultiply: 50.0,    
-        alphaSubtract: 0.15,
-        spawnInterval: 0.1,    // 对应 spawner.ts 的逻辑
+        alphaMultiply: 20.0,    // 调低一点，让雨滴边缘更自然
+        alphaSubtract: 0.1,     // 调低过滤阈值，确保小雨滴可见
+        spawnInterval: 0.1,    
     };
 
     class RainDrop {
@@ -25,7 +24,6 @@
         update(dt, height) {
             this.velocity += CONFIG.gravity * dt;
             this.y += this.velocity * dt;
-
             if (this.y - this.lastTrailY > this.nextTrailDist) {
                 this.lastTrailY = this.y;
                 return true; 
@@ -40,45 +38,32 @@
         this.canvas = document.createElement('canvas');
         container.appendChild(this.canvas);
         this.gl = this.canvas.getContext('webgl', { alpha: false });
-        
         this.drops = [];
         this.staticDrops = [];
         this.lastTime = 0;
         this.backgroundLoaded = false;
         this.bgImage = null;
-
         this.init();
     }
 
     RainRenderer.prototype.init = function() {
         const gl = this.gl;
-        // VS: 这里的 v 坐标需要翻转 Y 轴以匹配纹理
         const vs = `attribute vec2 p;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=p*0.5+0.5;v.y=1.0-v.y;}`;
-        
-        // FS: 核心修复点 - 增加背景缩放适配
         const fs = `
             precision mediump float;
             uniform sampler2D u_bg, u_water;
-            uniform vec2 u_res, u_bgRes; // 画布分辨率与背景图分辨率
+            uniform vec2 u_res, u_bgRes;
             varying vec2 v;
             uniform float u_ref, u_aMult, u_aSub;
-
             void main() {
-                // 1. 修复背景巨大的问题：计算覆盖比例 (Cover scale)
                 vec2 s = u_res / u_bgRes;
                 float scale = max(s.x, s.y);
                 vec2 uv = (v - 0.5) * (s / scale) + 0.5;
-
-                // 2. 采样水迹纹理
                 vec4 water = texture2D(u_water, v);
-                vec2 offset = (water.rg - 0.5) * u_ref * 0.1;
-                
-                // 3. 计算雨滴透明度
+                vec2 offset = (water.rg - 0.5) * u_ref * 0.2; // 稍微增加折射感
                 float alpha = clamp(water.a * u_aMult - u_aSub, 0.0, 1.0);
-                
-                // 4. 合成最终画面
                 vec4 bg = texture2D(u_bg, uv + offset);
-                gl_FragColor = mix(bg, bg + water.b * 0.2, alpha);
+                gl_FragColor = mix(bg, bg + water.b * 0.3, alpha);
             }
         `;
 
@@ -95,6 +80,13 @@
         this.texBg = gl.createTexture();
         this.texWater = gl.createTexture();
         
+        // --- 【核心修复：雨滴纹理参数设置】 ---
+        gl.bindTexture(gl.TEXTURE_2D, this.texWater);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
         this.waterCanvas = document.createElement('canvas');
         this.waterCtx = this.waterCanvas.getContext('2d');
         this.dropShape = this.createDropShape();
@@ -139,8 +131,6 @@
         this.ratio = window.devicePixelRatio || 1;
         this.canvas.width = this.waterCanvas.width = this.width * this.ratio;
         this.canvas.height = this.waterCanvas.height = this.height * this.ratio;
-        this.canvas.style.width = this.width + 'px';
-        this.canvas.style.height = this.height + 'px';
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     };
 
@@ -164,32 +154,28 @@
         const dt = Math.min((now - this.lastTime) / 1000, 0.033);
         this.lastTime = now;
 
-        // 【雨滴生成逻辑】
         if (Math.random() < CONFIG.spawnInterval) {
-            this.drops.push(new RainDrop(Math.random() * this.waterCanvas.width, -50, 25, this.ratio));
+            // 增加雨滴初始大小，确保清晰可见
+            this.drops.push(new RainDrop(Math.random() * this.waterCanvas.width, -50, 35, this.ratio));
         }
 
         const ctx = this.waterCtx;
         ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
-        // 1. 绘制静态水痕
         for (let i = this.staticDrops.length - 1; i >= 0; i--) {
             let s = this.staticDrops[i];
-            s.r -= dt * 2; 
+            s.r -= dt * 3; 
             if (s.r < 1) { this.staticDrops.splice(i, 1); continue; }
             ctx.drawImage(this.dropShape, s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
         }
 
-        // 2. 绘制动态雨滴
         for (let i = this.drops.length - 1; i >= 0; i--) {
             let d = this.drops[i];
             if (d.update(dt, this.waterCanvas.height)) {
-                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.4 });
+                this.staticDrops.push({ x: d.x, y: d.y, r: d.r * 0.5 });
             }
             if (d.terminated) { this.drops.splice(i, 1); continue; }
-            
-            // 物理拉伸效果
-            const h = d.r * (2.0 + d.velocity / 1000);
+            const h = d.r * (1.5 + d.velocity / 1200);
             ctx.drawImage(this.dropShape, d.x - d.r, d.y - h/2, d.r * 2, h);
         }
 
@@ -203,6 +189,7 @@
         
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
+        // --- 【核心步骤：每一帧重新上传雨滴位图】 ---
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
 
         const loc = (n) => gl.getUniformLocation(this.prog, n);
