@@ -161,12 +161,20 @@
 
         /* --- 找到这一段 --- */
         function toggleRules(e) {
-            e.stopPropagation();
-            const card = document.getElementById('mainRule');
-            // 修正判断逻辑：处理初次加载为空字符串的情况
-            const isHidden = card.style.display === 'none' || card.style.display === '';
-            card.style.display = isHidden ? 'block' : 'none';
-        }
+    e.stopPropagation();
+    const card = document.getElementById('mainRule');
+    const isHidden = card.style.display === 'none' || card.style.display === '';
+    
+    if (isHidden) {
+        card.style.display = 'block';
+        // 强制触发重绘，确保动画重新开始
+        card.style.animation = 'none';
+        card.offsetHeight; 
+        card.style.animation = null; 
+    } else {
+        card.style.display = 'none';
+    }
+}
 
         function updateClock() {
             document.getElementById('clock').innerText = new Date().toLocaleTimeString('zh-CN', {hour12: false});
