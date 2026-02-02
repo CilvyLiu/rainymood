@@ -1,7 +1,6 @@
 'use strict';
 
 (function() {
-    // 仿真参数
     const CONFIG = {
         gravity: 2400,
         trailDistance: [10, 30],
@@ -12,37 +11,30 @@
 
     class RainDrop {
         constructor(x, y, size, ratio, baseSpeed) {
-            // 1. 初始位置大幅度随机化，打破成排出现的规律
             this.x = x + (Math.random() - 0.5) * 80; 
             this.y = y - Math.random() * 400; 
             
-            // 2. 核心修改：尺寸阶梯分布（模拟真实雨水的大小比例）
-            // 60% 小雨滴，30% 中雨滴，10% 厚重的大雨滴
             const seed = Math.random();
             let sizeScale = seed > 0.9 ? 1.4 : (seed < 0.6 ? 0.65 : 1.0);
             this.r = size * ratio * sizeScale;
             
-            // 3. 物理随机性：大雨滴由于动量大，下落更快，阻力感小
             this.speedOffset = (0.7 + Math.random() * 0.5) * (sizeScale * 0.9);
             this.velocity = (150 + Math.random() * 300) * sizeScale; 
             
             this.terminated = false;
             this.lastTrailY = this.y;
-            // 越大的雨滴，留下的水痕间距越长
-            this.nextTrailDist = (Math.random() * 20 + 15) * ratio * sizeScale;
+            this.nextTrailDistance = (Math.random() * 20 + 15) * ratio * sizeScale;
         }
 
         update(dt, height, baseSpeed) {
             const accel = CONFIG.gravity * (baseSpeed / 4) * this.speedOffset; 
             this.velocity += accel * dt;
             this.y += (this.velocity + baseSpeed * 60) * dt;
-
-            // 模拟玻璃表面的微小摆动（去直线化）
             this.x += Math.sin(this.y * 0.03 + this.speedOffset) * 0.4;
 
-            if (this.y - this.lastTrailY > this.nextTrailDist) {
+            if (this.y - this.lastTrailY > this.nextTrailDistance) {
                 this.lastTrailY = this.y;
-                return true; // 触发拖尾生成
+                return true; 
             }
             if (this.y > height + 100) this.terminated = true;
             return false;
@@ -53,12 +45,13 @@
         this.container = container;
         this.canvas = document.createElement('canvas');
         container.appendChild(this.canvas);
-        this.gl = this.canvas.getContext('webgl', { alpha: true, depth: false });
+        this.gl = this.canvas.getContext('webgl', { alpha: false, depth: false });
         
         this.drops = [];
         this.staticDrops = [];
         this.lastTime = 0;
         this.options = { rainChance: 0.5, baseSpeed: 4 };
+        this.backgroundLoaded = false;
         
         this.init();
     }
@@ -147,6 +140,7 @@
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            this.backgroundLoaded = true;
         };
         img.src = url;
     };
@@ -155,7 +149,6 @@
         const dt = Math.min((now - this.lastTime) / 1000, 0.033);
         this.lastTime = now;
 
-        // 生成率微调，支持尺寸随机传入
         if (Math.random() < this.options.rainChance * 0.2) {
             const baseSize = 18; 
             this.drops.push(new RainDrop(Math.random() * this.waterCanvas.width, -50, baseSize, this.ratio, this.options.baseSpeed));
@@ -164,7 +157,6 @@
         const ctx = this.waterCtx;
         ctx.clearRect(0, 0, this.waterCanvas.width, this.waterCanvas.height);
 
-        // 绘制拖尾（保持较圆的形态，模拟滑过后的水渍）
         for (let i = this.staticDrops.length - 1; i >= 0; i--) {
             let s = this.staticDrops[i];
             s.r -= dt * 3.0; 
@@ -172,7 +164,6 @@
             ctx.drawImage(this.dropShape, s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
         }
 
-        // 绘制动态雨滴（长宽比非等比缩放，去除圆形感）
         for (let i = this.drops.length - 1; i >= 0; i--) {
             let d = this.drops[i];
             if (d.update(dt, this.waterCanvas.height, this.options.baseSpeed)) {
@@ -180,28 +171,38 @@
             }
             if (d.terminated) { this.drops.splice(i, 1); continue; }
             
-            // 【去圆化核心】：根据下落速度拉伸高度，窄化宽度
-            // 速度越快，水滴越长
             const stretchFactor = Math.min(d.velocity / 1200, 1.2);
             const h = d.r * (3.0 + stretchFactor); 
             const w = d.r * (1.3 - stretchFactor * 0.2); 
-            
             ctx.drawImage(this.dropShape, d.x - w/2, d.y - h/2, w, h);
         }
 
         const gl = this.gl;
+        gl.useProgram(this.prog);
+
+        // 【关键修复】：确保背景纹理始终绑定在 TEXTURE0
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.texBg);
+        
+        // 【关键修复】：确保水滴纹理始终绑定在 TEXTURE1
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.texWater);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.waterCanvas);
 
         const loc = (n) => gl.getUniformLocation(this.prog, n);
+        // 显式告诉着色器：u_bg 去读第0号单元，u_water 去读第1号单元
         gl.uniform1i(loc("u_bg"), 0);
         gl.uniform1i(loc("u_water"), 1);
+        
         gl.uniform1f(loc("u_ref"), CONFIG.refraction);
         gl.uniform1f(loc("u_aMult"), CONFIG.alphaMultiply);
         gl.uniform1f(loc("u_aSub"), CONFIG.alphaSubtract);
 
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        // 仅在背景加载完成后绘制，防止闪烁或全黑
+        if (this.backgroundLoaded) {
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+        
         requestAnimationFrame(t => this.loop(t));
     };
 
@@ -210,9 +211,11 @@
         if(!container) return;
         const renderer = new RainRenderer(container);
         window.rainEngine = renderer;
+        
+        // 确保你的图片路径 'pensive.png' 是正确的
         renderer.updateBackground('pensive.png'); 
+        
         window.addEventListener('resize', () => renderer.resize());
-        // 如果外部有天气切换函数，在此同步
         if(window.changeWeather) window.changeWeather(); 
     });
 })();
