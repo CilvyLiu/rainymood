@@ -11,15 +11,42 @@
     };
 
     class RainDrop {
-        constructor(x, y, size, ratio) {
-            this.x = x;
-            this.y = y;
-            this.r = size * ratio;
-            this.velocity = 0;
-            this.terminated = false;
-            this.lastTrailY = y;
-            this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
+    constructor(x, y, sizeRange, ratio) {
+        this.ratio = ratio;
+        // 1. 大小随机化：参考 simulator.ts 的 spawnSize
+        const baseSize = Math.random() * (sizeRange[1] - sizeRange[0]) + sizeRange[0];
+        this.r = baseSize * ratio;
+        
+        this.x = x;
+        this.y = y;
+        this.velocity = 0;
+        // 2. 引入随机水平漂移：参考 raindrop.ts 的 shifting
+        this.shifting = (Math.random() - 0.5) * 50 * ratio; 
+        this.terminated = false;
+        this.lastTrailY = y;
+        // 轨迹间距随机化
+        this.nextTrailDist = (Math.random() * (CONFIG.trailDistance[1] - CONFIG.trailDistance[0]) + CONFIG.trailDistance[0]) * ratio;
+    }
+
+    update(dt, height) {
+        // 3. 增加阻力感，让下落不那么线性
+        const resistance = 0.005 * this.r; 
+        const accel = CONFIG.gravity - (this.velocity * resistance);
+        
+        this.velocity += accel * dt;
+        this.y += this.velocity * dt;
+        
+        // 4. 让路径微微晃动，不再“太直”
+        this.x += Math.sin(this.y * 0.05) * (this.shifting * dt);
+
+        if (this.y - this.lastTrailY > this.nextTrailDist) {
+            this.lastTrailY = this.y;
+            return true; 
         }
+        if (this.y > height + 100) this.terminated = true;
+        return false;
+    }
+}
 
         update(dt, height) {
             this.velocity += CONFIG.gravity * dt;
