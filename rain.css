@@ -57,18 +57,20 @@
 }
 
 /* --- 2. 呼吸律动核心动画 --- */
+/* --- 2. 呼吸律动核心动画（已优化为冥想荧光版） --- */
 @keyframes breathing {
-    0% { 
-        box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 5px rgba(125, 211, 252, 0.1); 
-        border-color: rgba(255,255,255,0.15); 
+    0%, 100% { 
+        /* 吸气末尾或呼气结束：光影收敛 */
+        box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 10px rgba(125, 211, 252, 0.1); 
+        border-color: rgba(125, 211, 252, 0.15);
+        filter: drop-shadow(0 0 2px rgba(125, 211, 252, 0.05));
     }
     50% { 
-        box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 0 20px rgba(125, 211, 252, 0.3); 
-        border-color: rgba(125, 211, 252, 0.4); 
-    }
-    100% { 
-        box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 5px rgba(125, 211, 252, 0.1); 
-        border-color: rgba(255,255,255,0.15); 
+        /* 呼气最深处：光影绽放，淡淡荧光 */
+        box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 0 30px rgba(125, 211, 252, 0.25); 
+        border-color: rgba(125, 211, 252, 0.5); /* 边框稍稍亮起 */
+        /* 关键：增加多重滤镜模拟荧光灯管感 */
+        filter: drop-shadow(0 0 8px rgba(125, 211, 252, 0.3)) brightness(1.1);
     }
 }
 
